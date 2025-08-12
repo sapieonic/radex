@@ -1,0 +1,101 @@
+name: Health Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run health check daily at 6 AM UTC
+    - cron: '0 6 * * *'
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_DB: ragdb
+          POSTGRES_USER: raguser
+          POSTGRES_PASSWORD: changeme
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        env:
+          REDIS_PASSWORD: changeme
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      working-directory: ./server
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Check service connectivity
+      run: |
+        # Check PostgreSQL
+        pg_isready -h localhost -p 5432 -U raguser
+        
+        # Check Redis
+        redis-cli -h localhost -p 6379 ping
+
+    - name: Initialize database
+      working-directory: ./server
+      run: |
+        PGPASSWORD=changeme psql -h localhost -U raguser -d ragdb -f init.sql
+      env:
+        DATABASE_URL: postgresql+psycopg://raguser:changeme@localhost:5432/ragdb
+
+    - name: Start FastAPI server and test health endpoint
+      working-directory: ./server
+      run: |
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        SERVER_PID=$!
+        
+        # Wait for server to start
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8000/health
+        
+        # Test API documentation endpoint
+        curl -f http://localhost:8000/docs
+        
+        # Stop server
+        kill $SERVER_PID
+      env:
+        DATABASE_URL: postgresql+psycopg://raguser:changeme@localhost:5432/ragdb
+        REDIS_URL: redis://:changeme@localhost:6379/0
+        MINIO_ENDPOINT: localhost:9000
+        MINIO_ACCESS_KEY: minioadmin
+        MINIO_SECRET_KEY: minioadmin
+        MINIO_BUCKET: documents
+        JWT_SECRET_KEY: test-secret-key-for-health-check
+        JWT_ALGORITHM: HS256
+        JWT_EXPIRATION_MINUTES: 30
+        OPENAI_API_KEY: test-openai-key
+        APP_NAME: RAG RBAC Health Check
+        DEBUG: true

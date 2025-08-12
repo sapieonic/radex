@@ -1,0 +1,38 @@
+# Core FastAPI and web framework
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+
+# Database and ORM
+sqlalchemy==2.0.43
+psycopg[binary]==3.2.9
+pgvector==0.4.1
+alembic==1.16.4
+
+# Pydantic for data validation
+pydantic==2.11.7
+pydantic-settings==2.10.1
+email_validator==2.2.0
+
+# Authentication and security
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+
+# File upload and multipart
+python-multipart==0.0.20
+
+# External services
+minio==7.2.16
+redis==6.4.0
+celery==5.5.3
+openai==1.99.9
+
+# Document processing
+pypdf==6.0.0
+python-docx==1.2.0
+beautifulsoup4==4.13.4
+markdown==3.8.2
+
+# HTTP client and testing
+httpx==0.28.1
+pytest==8.4.1
+pytest-asyncio==1.1.0
