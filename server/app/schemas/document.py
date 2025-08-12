@@ -30,7 +30,7 @@ class DocumentInDB(DocumentBase):
         populate_by_name = True
 
 class Document(DocumentInDB):
-    pass
+    embedding_status: Optional[str] = Field(default="pending", description="Status of embedding processing: pending, processing, completed, failed")
 
 class DocumentUploadResponse(BaseModel):
     id: UUID

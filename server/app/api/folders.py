@@ -25,7 +25,7 @@ def build_folder_path(db: Session, parent_id: UUID = None, folder_name: str = ""
     return f"/{folder_name}"
 
 @router.get("/", response_model=List[FolderWithPermissions])
-def list_folders(
+async def list_folders(
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -54,7 +54,7 @@ def list_folders(
     return folders_with_permissions
 
 @router.post("/", response_model=Folder, status_code=status.HTTP_201_CREATED)
-def create_folder(
+async def create_folder(
     folder_data: FolderCreate,
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -100,7 +100,7 @@ def create_folder(
     return new_folder
 
 @router.get("/{folder_id}", response_model=FolderWithPermissions)
-def get_folder(
+async def get_folder(
     folder_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -130,7 +130,7 @@ def get_folder(
     return FolderWithPermissions(**folder_dict)
 
 @router.put("/{folder_id}", response_model=Folder)
-def update_folder(
+async def update_folder(
     folder_id: UUID,
     folder_update: FolderUpdate,
     current_user: UserModel = Depends(get_current_active_user),
@@ -163,7 +163,7 @@ def update_folder(
     return folder
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_folder(
+async def delete_folder(
     folder_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -180,7 +180,7 @@ def delete_folder(
     db.commit()
 
 @router.post("/{folder_id}/permissions", response_model=PermissionInfo, status_code=status.HTTP_201_CREATED)
-def grant_folder_permission(
+async def grant_folder_permission(
     folder_id: UUID,
     permission_grant: PermissionGrant,
     current_user: UserModel = Depends(get_current_active_user),
@@ -202,7 +202,7 @@ def grant_folder_permission(
     return permission
 
 @router.get("/{folder_id}/permissions", response_model=List[PermissionInfo])
-def list_folder_permissions(
+async def list_folder_permissions(
     folder_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -210,19 +210,19 @@ def list_folder_permissions(
     """List all permissions for a folder"""
     permission_service = PermissionService(db)
     
-    # Check if user has admin access to the folder
+    # Check if user has admin access to the folder or is superuser
     folder = db.query(FolderModel).filter(FolderModel.id == folder_id).first()
     if not folder:
         raise NotFoundException("Folder not found")
     
-    if folder.owner_id != current_user.id and not permission_service.check_folder_permission(current_user.id, folder_id, "admin"):
+    if not current_user.is_superuser and folder.owner_id != current_user.id and not permission_service.check_folder_permission(current_user.id, folder_id, "admin"):
         raise PermissionDeniedException("You don't have permission to view folder permissions")
     
     permissions = permission_service.get_folder_permissions(folder_id)
     return permissions
 
 @router.delete("/{folder_id}/permissions/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def revoke_folder_permission(
+async def revoke_folder_permission(
     folder_id: UUID,
     user_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),

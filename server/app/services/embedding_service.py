@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 import openai
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.models import Document, Embedding
 from app.config import settings
 from app.core.exceptions import BadRequestException, NotFoundException
@@ -129,29 +130,32 @@ class EmbeddingService:
             # Build SQL query for vector similarity search
             folder_ids_str = ",".join([f"'{folder_id}'" for folder_id in folder_ids])
             
-            query = f"""
+            # Convert query embedding to string format for PostgreSQL vector
+            query_embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
+            
+            query = text(f"""
                 SELECT 
                     e.id,
                     e.document_id,
                     e.chunk_index,
                     e.chunk_text,
-                    e.embed_metadata,
+                    e.metadata as embed_metadata,
                     d.filename,
                     d.folder_id,
                     f.name as folder_name,
-                    (1 - (e.embedding <=> %s::vector)) as similarity_score
+                    (1 - (e.embedding <=> :query_embedding ::vector)) as similarity_score
                 FROM embeddings e
                 JOIN documents d ON e.document_id = d.id
                 JOIN folders f ON d.folder_id = f.id
                 WHERE d.folder_id IN ({folder_ids_str})
-                AND (1 - (e.embedding <=> %s::vector)) >= %s
-                ORDER BY e.embedding <=> %s::vector
-                LIMIT %s
-            """
+                AND (1 - (e.embedding <=> :query_embedding ::vector)) >= :min_similarity
+                ORDER BY e.embedding <=> :query_embedding ::vector
+                LIMIT :limit
+            """)
             
             result = self.db.execute(
                 query,
-                (query_embedding, query_embedding, min_similarity, query_embedding, limit)
+                {"query_embedding": query_embedding_str, "min_similarity": min_similarity, "limit": limit}
             )
             
             results = []

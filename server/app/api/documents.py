@@ -62,6 +62,7 @@ def get_document_metadata(
     """Get document metadata"""
     permission_service = PermissionService(db)
     document_service = DocumentService(db)
+    embedding_service = EmbeddingService(db)
     
     document = document_service.get_document(document_id)
     if not document:
@@ -70,7 +71,25 @@ def get_document_metadata(
     # Check read permission for folder
     permission_service.check_folder_access(current_user.id, document.folder_id, "read")
     
-    return document
+    # Check embedding status
+    embeddings = embedding_service.get_document_embeddings(document_id)
+    embedding_status = "completed" if embeddings and len(embeddings) > 0 else "pending"
+    
+    # Create document with status
+    doc_dict = {
+        "id": document.id,
+        "filename": document.filename,
+        "file_type": document.file_type,
+        "folder_id": document.folder_id,
+        "file_size": document.file_size,
+        "file_path": document.file_path,
+        "uploaded_by": document.uploaded_by,
+        "created_at": document.created_at,
+        "updated_at": document.updated_at,
+        "embedding_status": embedding_status
+    }
+    
+    return Document(**doc_dict)
 
 @router.get("/documents/{document_id}/download")
 async def download_document(
@@ -144,12 +163,37 @@ def list_folder_documents(
     """List all documents in a folder"""
     permission_service = PermissionService(db)
     document_service = DocumentService(db)
+    embedding_service = EmbeddingService(db)
     
     # Check read permission for folder
     permission_service.check_folder_access(current_user.id, folder_id, "read")
     
     documents = document_service.get_documents_in_folder(folder_id)
-    return documents
+    
+    # Add embedding status to each document
+    documents_with_status = []
+    for doc in documents:
+        doc_dict = {
+            "id": doc.id,
+            "filename": doc.filename,
+            "file_type": doc.file_type,
+            "folder_id": doc.folder_id,
+            "file_size": doc.file_size,
+            "file_path": doc.file_path,
+            "uploaded_by": doc.uploaded_by,
+            "created_at": doc.created_at,
+            "updated_at": doc.updated_at,
+            "embedding_status": "pending"  # Default status
+        }
+        
+        # Check if embeddings exist for this document
+        embeddings = embedding_service.get_document_embeddings(doc.id)
+        if embeddings and len(embeddings) > 0:
+            doc_dict["embedding_status"] = "completed"
+        
+        documents_with_status.append(Document(**doc_dict))
+    
+    return documents_with_status
 
 @router.post("/documents/{document_id}/reprocess-embeddings", status_code=status.HTTP_202_ACCEPTED)
 async def reprocess_document_embeddings(
