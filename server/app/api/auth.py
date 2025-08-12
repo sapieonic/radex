@@ -51,14 +51,14 @@ def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me", response_model=User)
-def get_current_user_info(
+async def get_current_user_info(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get current user information"""
     return current_user
 
 @router.post("/refresh", response_model=Token)
-def refresh_token(
+async def refresh_token(
     current_user: User = Depends(get_current_active_user)
 ):
     """Refresh access token"""
@@ -70,7 +70,7 @@ def refresh_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-def delete_current_user(
+async def delete_current_user(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):

@@ -16,6 +16,11 @@ class PermissionService:
         permission_type: str = "read"
     ) -> bool:
         """Check if user has specific permission on folder"""
+        # Check if user is superuser first
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if user and user.is_superuser:
+            return True
+        
         folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
         if not folder:
             raise NotFoundException("Folder not found")
@@ -48,6 +53,12 @@ class PermissionService:
     
     def get_user_accessible_folders(self, user_id: UUID) -> List[Folder]:
         """Get all folders accessible to user"""
+        # Check if user is superuser first
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if user and user.is_superuser:
+            # Superuser can access all folders
+            return self.db.query(Folder).all()
+        
         # Get folders owned by user
         owned_folders = self.db.query(Folder).filter(Folder.owner_id == user_id).all()
         
@@ -84,11 +95,14 @@ class PermissionService:
         is_admin: bool = False
     ) -> Permission:
         """Grant permission to user for folder"""
-        # Check if granter has admin rights
-        if not self.check_folder_permission(granter_id, folder_id, "admin"):
-            folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
-            if not folder or folder.owner_id != granter_id:
-                raise PermissionDeniedException("You don't have permission to grant access to this folder")
+        # Check if granter is superuser
+        granter = self.db.query(User).filter(User.id == granter_id).first()
+        if not (granter and granter.is_superuser):
+            # If not superuser, check if granter has admin rights
+            if not self.check_folder_permission(granter_id, folder_id, "admin"):
+                folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
+                if not folder or folder.owner_id != granter_id:
+                    raise PermissionDeniedException("You don't have permission to grant access to this folder")
         
         # Check if permission already exists
         existing_permission = self.db.query(Permission).filter(
@@ -127,13 +141,16 @@ class PermissionService:
         folder_id: UUID
     ) -> bool:
         """Revoke user's permission for folder"""
-        # Check if revoker has admin rights
-        folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
-        if not folder:
-            raise NotFoundException("Folder not found")
-        
-        if folder.owner_id != revoker_id and not self.check_folder_permission(revoker_id, folder_id, "admin"):
-            raise PermissionDeniedException("You don't have permission to revoke access to this folder")
+        # Check if revoker is superuser
+        revoker = self.db.query(User).filter(User.id == revoker_id).first()
+        if not (revoker and revoker.is_superuser):
+            # If not superuser, check if revoker has admin rights
+            folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
+            if not folder:
+                raise NotFoundException("Folder not found")
+            
+            if folder.owner_id != revoker_id and not self.check_folder_permission(revoker_id, folder_id, "admin"):
+                raise PermissionDeniedException("You don't have permission to revoke access to this folder")
         
         permission = self.db.query(Permission).filter(
             Permission.user_id == user_id,

@@ -73,3 +73,14 @@ CREATE INDEX idx_documents_folder ON documents(folder_id);
 CREATE INDEX idx_permissions_user_folder ON permissions(user_id, folder_id);
 CREATE INDEX idx_embeddings_document ON embeddings(document_id);
 CREATE INDEX idx_embeddings_vector ON embeddings USING ivfflat (embedding vector_cosine_ops);
+
+-- Insert default admin user (password: admin123456)
+-- Password hash generated with bcrypt for 'admin123456'
+INSERT INTO users (email, username, hashed_password, is_active, is_superuser) 
+VALUES (
+    'admin@example.com', 
+    'admin', 
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewgF5W9rVq8uUWsS',
+    true, 
+    true
+) ON CONFLICT (email) DO NOTHING;

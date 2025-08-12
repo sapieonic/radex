@@ -9,8 +9,12 @@ class UserBase(BaseModel):
     is_active: bool = True
     is_superuser: bool = False
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    email: EmailStr
+    username: str = Field(..., min_length=3, max_length=100)
     password: str = Field(..., min_length=8)
+    is_active: bool = True
+    # is_superuser removed for security - only set via database/admin
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None

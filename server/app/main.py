@@ -6,7 +6,7 @@ import uvicorn
 from app.config import settings
 from app.database import engine
 from app.models import Base
-from app.api import auth, folders, documents, rag
+from app.api import auth, folders, documents, rag, users
 from app.core.exceptions import (
     CredentialsException,
     PermissionDeniedException,
@@ -80,6 +80,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
 app.include_router(rag.router, prefix="/api/v1/rag", tags=["rag"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 
 # Root endpoints
 @app.get("/")

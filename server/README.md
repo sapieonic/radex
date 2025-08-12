@@ -40,7 +40,51 @@ docker-compose up --build
 docker-compose up -d postgres redis minio
 ```
 
-### 3. Access the Application
+### 3. Create Admin User
+
+The system includes a default admin user that's automatically created during database initialization:
+
+**Default Admin Credentials:**
+- **Username**: `admin`
+- **Password**: `admin123456`
+- **Email**: `admin@example.com`
+
+#### Alternative: Create Admin User Manually
+
+If you need to create additional admin users or the default admin doesn't exist, use the provided script:
+
+```bash
+# Option 1: Use the interactive script
+./create_superuser.sh
+
+# Option 2: Create directly via SQL (if using Docker)
+docker exec -i server-postgres-1 psql -U raguser -d ragdb << 'EOF'
+INSERT INTO users (email, username, hashed_password, is_active, is_superuser) 
+VALUES (
+    'admin@example.com', 
+    'admin', 
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewgF5W9rVq8uUWsS',
+    true, 
+    true
+) ON CONFLICT (email) DO NOTHING;
+EOF
+
+# Option 3: Use the Python script
+python create_admin_user.py
+```
+
+#### Admin User Capabilities
+
+Admin users (superusers) have full system access including:
+- View and manage all folders regardless of ownership
+- Grant/revoke permissions on any folder to any user  
+- Create, update, and delete any user account
+- Access all admin-only API endpoints
+- View system-wide statistics and logs
+
+**⚠️ Security Note**: Change the default admin password immediately in production environments.
+
+### 4. Access the Application
 
 - **API Documentation**: http://localhost:8000/docs
 - **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
@@ -48,7 +92,16 @@ docker-compose up -d postgres redis minio
 
 ## API Usage Examples
 
-### 1. Register a User
+### 1. Admin Login
+
+```bash
+# Login as admin user
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123456"
+```
+
+### 2. Register a User
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/auth/register" \
@@ -60,7 +113,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/register" \
   }'
 ```
 
-### 2. Login
+### 3. Regular User Login
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
@@ -68,7 +121,7 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -d "username=testuser&password=securepassword123"
 ```
 
-### 3. Create a Folder
+### 4. Create a Folder
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/folders" \
@@ -80,7 +133,7 @@ curl -X POST "http://localhost:8000/api/v1/folders" \
   }'
 ```
 
-### 4. Upload a Document
+### 5. Upload a Document
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/folders/{folder_id}/documents" \
@@ -88,7 +141,35 @@ curl -X POST "http://localhost:8000/api/v1/folders/{folder_id}/documents" \
   -F "file=@path/to/your/document.pdf"
 ```
 
-### 5. Query with RAG
+### 6. Find a User (for sharing)
+
+```bash
+# Find user by email
+curl -X GET "http://localhost:8000/api/v1/users/find?email=user@example.com" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Find user by username
+curl -X GET "http://localhost:8000/api/v1/users/find?username=testuser" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### 7. Admin: Create a User
+
+```bash
+# Admin users can create other users with any privileges
+curl -X POST "http://localhost:8000/api/v1/users/" \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@example.com",
+    "username": "newuser",
+    "password": "securepassword123",
+    "is_active": true,
+    "is_superuser": false
+  }'
+```
+
+### 8. Query with RAG
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/rag/query" \
@@ -302,6 +383,15 @@ tests/
 - `GET /api/v1/documents/{id}/download` - Download document
 - `DELETE /api/v1/documents/{id}` - Delete document
 - `GET /api/v1/folders/{folder_id}/documents` - List folder documents
+
+### Users
+- `GET /api/v1/users/find` - Find user by email/username (all users)
+- `GET /api/v1/users/` - List users with filters (admin only)
+- `GET /api/v1/users/search` - Search users (admin only) 
+- `GET /api/v1/users/{id}` - Get user by ID (admin only)
+- `POST /api/v1/users/` - Create user (admin only)
+- `PUT /api/v1/users/{id}` - Update user (admin only)
+- `DELETE /api/v1/users/{id}` - Delete user (admin only)
 
 ### RAG
 - `POST /api/v1/rag/query` - Submit RAG query
