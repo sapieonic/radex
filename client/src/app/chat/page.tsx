@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChatMessage, RAGQuery, RAGResponse } from '@/types/rag';
+import { ChatMessage, RAGResponse } from '@/types/rag';
 import { Folder } from '@/types/folder';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +13,6 @@ import {
   User, 
   Bot, 
   Copy, 
-  ExternalLink,
   CheckSquare,
   Square,
   ChevronDown,
@@ -104,12 +103,12 @@ export default function ChatPage() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to query RAG:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: error.response?.data?.detail || 'Sorry, I encountered an error processing your query.',
+        content: 'Sorry, I encountered an error processing your query.',
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -260,7 +259,7 @@ export default function ChatPage() {
                                     <span className="font-medium">Folder:</span> {source.folder_name}
                                   </div>
                                   <div className="text-gray-600 line-clamp-3 italic">
-                                    "{source.chunk_text}"
+                                    &quot;{source.chunk_text}&quot;
                                   </div>
                                   <div className="text-blue-600 mt-1 font-medium">
                                     {(source.relevance_score * 100).toFixed(0)}% match

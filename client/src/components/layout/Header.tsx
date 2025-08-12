@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/Button';
 import { User, LogOut, Settings, Search } from 'lucide-react';
 
 export default function Header() {

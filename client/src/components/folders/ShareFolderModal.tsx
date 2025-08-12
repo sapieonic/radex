@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -11,7 +11,6 @@ import {
   User, 
   X, 
   Plus, 
-  Shield,
   Eye,
   Edit,
   Trash2,
@@ -66,6 +65,18 @@ export default function ShareFolderModal({ isOpen, onClose, folderId, folderName
     is_admin: false
   });
 
+  const loadExistingPermissions = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const permissions = await apiClient.getFolderPermissions(folderId);
+      setExistingPermissions(permissions);
+    } catch {
+      setError('Failed to load existing permissions');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [folderId]);
+
   useEffect(() => {
     if (isOpen) {
       loadExistingPermissions();
@@ -74,19 +85,7 @@ export default function ShareFolderModal({ isOpen, onClose, folderId, folderName
       setSearchQuery('');
       setSearchResults([]);
     }
-  }, [isOpen, folderId]);
-
-  const loadExistingPermissions = async () => {
-    try {
-      setIsLoading(true);
-      const permissions = await apiClient.getFolderPermissions(folderId);
-      setExistingPermissions(permissions);
-    } catch (error: any) {
-      setError('Failed to load existing permissions');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isOpen, folderId, loadExistingPermissions]);
 
   const searchUsers = async (query: string) => {
     if (query.length < 2) {
@@ -101,27 +100,23 @@ export default function ShareFolderModal({ isOpen, onClose, folderId, folderName
       // First try to find by email (if query looks like an email)
       if (trimmedQuery.includes('@')) {
         try {
-          const response = await apiClient.client.get('/api/v1/users/find', {
-            params: { email: trimmedQuery }
-          });
-          setSearchResults([response.data]);
+          const user = await apiClient.findUser({ email: trimmedQuery });
+          setSearchResults([user]);
           return;
-        } catch (emailError) {
+        } catch {
           // If email not found, continue to username search
         }
       }
       
       // Try to find by username
       try {
-        const response = await apiClient.client.get('/api/v1/users/find', {
-          params: { username: trimmedQuery }
-        });
-        setSearchResults([response.data]);
-      } catch (usernameError) {
+        const user = await apiClient.findUser({ username: trimmedQuery });
+        setSearchResults([user]);
+      } catch {
         // If exact matches fail, no results found
         setSearchResults([]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to find user:', error);
       setSearchResults([]);
     } finally {
@@ -156,8 +151,8 @@ export default function ShareFolderModal({ isOpen, onClose, folderId, folderName
       setSearchQuery('');
       setSearchResults([]);
       await loadExistingPermissions();
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Failed to grant permission');
+    } catch {
+      setError('Failed to grant permission');
     }
   };
 
@@ -173,8 +168,8 @@ export default function ShareFolderModal({ isOpen, onClose, folderId, folderName
       await apiClient.revokeFolderPermission(folderId, userId);
       setSuccess('Permission revoked successfully');
       await loadExistingPermissions();
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Failed to revoke permission');
+    } catch {
+      setError('Failed to revoke permission');
     }
   };
 

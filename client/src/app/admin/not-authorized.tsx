@@ -12,7 +12,7 @@ export default function NotAuthorized() {
           <Shield className="mx-auto h-16 w-16 text-red-500" />
           <h2 className="mt-6 text-3xl font-bold text-gray-900">Access Denied</h2>
           <p className="mt-4 text-lg text-gray-600">
-            You don't have permission to access the admin panel.
+            You don&apos;t have permission to access the admin panel.
           </p>
           <p className="mt-2 text-sm text-gray-500">
             Only administrators can access this area.

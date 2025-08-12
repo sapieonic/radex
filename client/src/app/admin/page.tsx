@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
@@ -17,8 +17,6 @@ import {
   UserCheck,
   UserX,
   Search,
-  Filter,
-  MoreVertical,
   Crown,
   ArrowLeft,
   Plus,
@@ -27,6 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import apiClient from '@/lib/api';
+import { getErrorMessage } from '@/lib/utils';
 import UserFormModal from '@/components/admin/UserFormModal';
 
 interface AdminUser {
@@ -64,7 +63,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
-  const [error, setError] = useState('');
+  const [, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [userModalMode, setUserModalMode] = useState<'create' | 'edit'>('create');
@@ -146,9 +145,9 @@ export default function AdminPage() {
       setError('');
       await apiClient.deleteUser(userId);
       await loadUsersWithFilters();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to delete user:', error);
-      setError(error.response?.data?.detail || 'Failed to delete user');
+      setError(getErrorMessage(error, 'Failed to delete user'));
     }
   };
 
@@ -158,12 +157,12 @@ export default function AdminPage() {
     setSelectedUser(null);
   };
 
-  const loadUsersWithFilters = async () => {
+  const loadUsersWithFilters = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
       
-      const params: any = { limit: 100 };
+      const params: Record<string, unknown> = { limit: 100 };
       
       // Add status filter
       if (filterStatus !== 'all') {
@@ -201,21 +200,21 @@ export default function AdminPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchQuery, filterStatus]);
 
   // Trigger search when filters change
   useEffect(() => {
     if (user?.is_superuser) {
       loadUsersWithFilters();
     }
-  }, [searchQuery, filterStatus, user?.is_superuser]);
+  }, [searchQuery, filterStatus, user?.is_superuser, loadUsersWithFilters]);
 
   const filteredUsers = users;
 
   const StatCard = ({ title, value, icon: Icon, color }: {
     title: string;
     value: string | number;
-    icon: any;
+    icon: React.ComponentType<{className?: string}>;
     color: string;
   }) => (
     <div className="bg-white rounded-lg shadow p-6">
@@ -248,7 +247,7 @@ export default function AdminPage() {
           <Shield className="mx-auto h-16 w-16 text-red-500 mb-6" />
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Access Denied</h2>
           <p className="text-lg text-gray-600 mb-4">
-            You don't have permission to access the admin panel.
+            You don&apos;t have permission to access the admin panel.
           </p>
           <p className="text-sm text-gray-500 mb-8">
             Only administrators can access this area.

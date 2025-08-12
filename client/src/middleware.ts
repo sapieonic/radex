@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function middleware(_request: NextRequest) {
   // For now, let's disable middleware to avoid redirect loops during development
   // We'll handle authentication redirects in the client-side components
   return NextResponse.next();

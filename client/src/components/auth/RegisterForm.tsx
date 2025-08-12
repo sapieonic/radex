@@ -32,8 +32,8 @@ export default function RegisterForm() {
     try {
       await register(email, username, password);
       router.push('/dashboard');
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Registration failed');
+    } catch {
+      setError('Registration failed');
     } finally {
       setIsLoading(false);
     }

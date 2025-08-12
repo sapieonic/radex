@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Folder as FolderType } from '@/types/folder';
 import { Document } from '@/types/document';
@@ -16,7 +16,6 @@ import {
   Trash2,
   Download,
   Calendar,
-  User,
   Shield,
   Share2
 } from 'lucide-react';
@@ -36,13 +35,7 @@ export default function FolderDetailPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  useEffect(() => {
-    if (folderId) {
-      loadFolderData();
-    }
-  }, [folderId]);
-
-  const loadFolderData = async () => {
+  const loadFolderData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [folderData, documentsData] = await Promise.all([
@@ -56,7 +49,13 @@ export default function FolderDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [folderId]);
+
+  useEffect(() => {
+    if (folderId) {
+      loadFolderData();
+    }
+  }, [folderId, loadFolderData]);
 
   const handleUpdateFolderName = async () => {
     if (!newName.trim() || !folder) return;

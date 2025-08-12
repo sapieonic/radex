@@ -32,8 +32,8 @@ export default function ProfilePage() {
       // TODO: Implement profile update API call
       setSuccessMessage('Profile updated successfully');
       setIsEditing(false);
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.detail || 'Failed to update profile');
+    } catch {
+      setErrorMessage('Failed to update profile');
     }
   };
 
@@ -52,8 +52,8 @@ export default function ProfilePage() {
       setSuccessMessage('Password changed successfully');
       setShowPasswordForm(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    } catch (error: any) {
-      setErrorMessage(error.response?.data?.detail || 'Failed to change password');
+    } catch {
+      setErrorMessage('Failed to change password');
     }
   };
 

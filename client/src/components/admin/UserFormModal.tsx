@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import apiClient from '@/lib/api';
-import { User, Eye, EyeOff, Crown, UserCheck } from 'lucide-react';
+import { Eye, EyeOff, Crown, UserCheck } from 'lucide-react';
 
 interface AdminUser {
   id: string;
@@ -77,7 +77,7 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, user, mode }
           is_superuser: formData.is_superuser
         });
       } else if (mode === 'edit' && user) {
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
           email: formData.email,
           username: formData.username,
           is_active: formData.is_active,
@@ -94,8 +94,8 @@ export default function UserFormModal({ isOpen, onClose, onSuccess, user, mode }
 
       onSuccess();
       onClose();
-    } catch (error: any) {
-      setError(error.response?.data?.detail || `Failed to ${mode} user`);
+    } catch {
+      setError(`Failed to ${mode} user`);
     } finally {
       setIsSubmitting(false);
     }

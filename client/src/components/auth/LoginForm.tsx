@@ -24,8 +24,9 @@ export default function LoginForm() {
     try {
       await login(username, password);
       router.push('/dashboard');
-    } catch (error: any) {
-      setError(error.response?.data?.detail || 'Login failed');
+    } catch (error: unknown) {
+      const message = error && typeof error === 'object' && 'response' in error ? 'Login failed' : 'Login failed';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
