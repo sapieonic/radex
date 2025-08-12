@@ -164,13 +164,3 @@ jobs:
           kill $(cat fastapi.pid) || true
           rm fastapi.pid
         fi
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: smoke-test-results
-        path: |
-          server/pytest-results.xml
-          server/coverage.xml
-        retention-days: 30
