@@ -17,11 +17,15 @@ import {
   Download,
   Calendar,
   Shield,
-  Share2
+  Share2,
+  Cloud,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDropzone } from 'react-dropzone';
 import ShareFolderModal from '@/components/folders/ShareFolderModal';
+import ConfluenceImportWizard from '@/components/confluence/ConfluenceImportWizard';
+import ConfluenceImportStatus from '@/components/confluence/ConfluenceImportStatus';
 
 export default function FolderDetailPage() {
   const params = useParams();
@@ -34,6 +38,8 @@ export default function FolderDetailPage() {
   const [newName, setNewName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showConfluenceWizard, setShowConfluenceWizard] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'confluence'>('upload');
 
   const loadFolderData = useCallback(async () => {
     try {
@@ -95,6 +101,12 @@ export default function FolderDetailPage() {
     } catch (error) {
       console.error('Failed to download document:', error);
     }
+  };
+
+  const handleConfluenceImportSuccess = (importIds: string[]) => {
+    setShowConfluenceWizard(false);
+    // Optionally reload folder data to show any immediate imports
+    setTimeout(() => loadFolderData(), 2000);
   };
 
   const onDrop = async (acceptedFiles: File[]) => {
@@ -232,35 +244,84 @@ export default function FolderDetailPage() {
         </div>
       </div>
 
-      {/* Upload Area */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Documents</h2>
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragActive 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-gray-300 hover:border-gray-400'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          {isDragActive ? (
-            <p className="text-blue-600">Drop the files here...</p>
+      {/* Add Content Area */}
+      <div className="bg-white rounded-lg shadow">
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 px-6">
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'upload'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Upload className="w-4 h-4 mr-2 inline-block" />
+              File Upload
+            </button>
+            <button
+              onClick={() => setActiveTab('confluence')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'confluence'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Cloud className="w-4 h-4 mr-2 inline-block" />
+              Confluence Sync
+            </button>
+          </nav>
+        </div>
+
+        <div className="p-6">
+          {activeTab === 'upload' ? (
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Documents</h2>
+              <div
+                {...getRootProps()}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragActive 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <input {...getInputProps()} />
+                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                {isDragActive ? (
+                  <p className="text-blue-600">Drop the files here...</p>
+                ) : (
+                  <div>
+                    <p className="text-gray-600 mb-2">
+                      Drag and drop files here, or click to select
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Supports PDF, DOC, DOCX, TXT, MD, HTML files
+                    </p>
+                  </div>
+                )}
+                {isUploading && (
+                  <div className="mt-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-600 mt-2">Uploading...</p>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <div>
-              <p className="text-gray-600 mb-2">
-                Drag and drop files here, or click to select
-              </p>
-              <p className="text-sm text-gray-500">
-                Supports PDF, DOC, DOCX, TXT, MD, HTML files
-              </p>
-            </div>
-          )}
-          {isUploading && (
-            <div className="mt-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm text-gray-600 mt-2">Uploading...</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900">Confluence Sync</h2>
+                  <p className="text-sm text-gray-600">Import content from your Confluence spaces</p>
+                </div>
+                <Button onClick={() => setShowConfluenceWizard(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Import from Confluence
+                </Button>
+              </div>
+              
+              <ConfluenceImportStatus folderId={folderId} />
             </div>
           )}
         </div>
@@ -342,6 +403,14 @@ export default function FolderDetailPage() {
           folderName={folder.name}
         />
       )}
+
+      {/* Confluence Import Wizard */}
+      <ConfluenceImportWizard
+        isOpen={showConfluenceWizard}
+        onClose={() => setShowConfluenceWizard(false)}
+        onSuccess={handleConfluenceImportSuccess}
+        folderId={folderId}
+      />
     </div>
   );
 }

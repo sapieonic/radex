@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, LogOut, Settings, Search } from 'lucide-react';
+import { User, LogOut, Settings, Search, Cloud } from 'lucide-react';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -36,6 +36,13 @@ export default function Header() {
                 className="hover:text-blue-200 transition-colors"
               >
                 RAG Chat
+              </Link>
+              <Link
+                href="/confluence"
+                className="hover:text-blue-200 transition-colors flex items-center"
+              >
+                <Cloud className="w-4 h-4 mr-1" />
+                Confluence
               </Link>
               {user?.is_superuser && (
                 <Link
