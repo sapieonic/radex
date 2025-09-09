@@ -23,6 +23,19 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
     
+    # Confluence Integration
+    confluence_oauth_client_id: Optional[str] = None
+    confluence_oauth_client_secret: Optional[str] = None
+    confluence_oauth_redirect_uri: Optional[str] = None
+    confluence_encryption_key: Optional[str] = None
+    confluence_max_import_size: int = 100  # MB
+    confluence_rate_limit: int = 10  # requests per second
+    confluence_sync_interval: int = 3600  # seconds
+    
+    # Celery
+    celery_broker_url: Optional[str] = None
+    celery_result_backend: Optional[str] = None
+    
     # App
     app_name: str = "RAG RBAC System"
     debug: bool = True

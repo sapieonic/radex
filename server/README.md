@@ -10,7 +10,9 @@ A comprehensive Retrieval-Augmented Generation (RAG) solution with role-based ac
 - **Vector Embeddings**: Automatic document processing and embedding generation using OpenAI
 - **RAG Queries**: AI-powered question answering with source citations
 - **Role-Based Access Control**: Fine-grained permissions at folder and document levels
+- **Confluence Integration**: Import and sync content from Confluence Cloud/Server/Data Center
 - **File Storage**: MinIO S3-compatible object storage
+- **Background Processing**: Celery-based async tasks for large imports
 - **Scalable Architecture**: Containerized deployment with Docker
 
 ## Quick Start
@@ -19,6 +21,7 @@ A comprehensive Retrieval-Augmented Generation (RAG) solution with role-based ac
 
 - Docker and Docker Compose
 - OpenAI API Key
+- (Optional) Confluence API Token or OAuth credentials for Confluence integration
 
 ### 1. Environment Setup
 
@@ -182,16 +185,70 @@ curl -X POST "http://localhost:8000/api/v1/rag/query" \
   }'
 ```
 
+### 9. Confluence Integration
+
+#### Add Confluence Credentials
+```bash
+curl -X POST "http://localhost:8000/api/v1/confluence/auth" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "confluence_type": "cloud",
+    "base_url": "https://yourcompany.atlassian.net",
+    "email": "your-email@company.com",
+    "api_token": "your-confluence-api-token"
+  }'
+```
+
+#### List Confluence Spaces
+```bash
+curl -X GET "http://localhost:8000/api/v1/confluence/spaces?credential_id=CREDENTIAL_ID" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Import Confluence Space
+```bash
+curl -X POST "http://localhost:8000/api/v1/confluence/import" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credential_id": "CREDENTIAL_ID",
+    "folder_id": "FOLDER_ID",
+    "import_type": "space",
+    "space_key": "SPACE_KEY",
+    "include_attachments": true
+  }'
+```
+
+#### Check Import Status
+```bash
+curl -X GET "http://localhost:8000/api/v1/confluence/import/IMPORT_ID/status" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ## Project Structure
 
 ```
 server/
 ├── app/
 │   ├── api/           # API endpoints
+│   │   └── confluence.py  # Confluence integration endpoints
 │   ├── core/          # Security, dependencies, exceptions
 │   ├── models/        # SQLAlchemy models
+│   │   ├── confluence_credential.py
+│   │   ├── confluence_import.py
+│   │   └── confluence_page.py
 │   ├── schemas/       # Pydantic schemas
+│   │   └── confluence.py
 │   ├── services/      # Business logic services
+│   │   └── confluence/    # Confluence integration services
+│   │       ├── auth_service.py
+│   │       ├── client.py
+│   │       ├── extractor.py
+│   │       └── import_service.py
+│   ├── workers/       # Background task workers
+│   │   ├── confluence_import.py
+│   │   └── confluence_sync.py
 │   ├── utils/         # Utilities (file processing, text chunking)
 │   ├── config.py      # Configuration settings
 │   ├── database.py    # Database connection
@@ -201,16 +258,27 @@ server/
 ├── Dockerfile         # Application container
 ├── requirements.txt   # Python dependencies
 ├── init.sql          # Database initialization
-└── .env.example      # Environment template
+├── .env.example      # Environment template
+├── .env.confluence.example  # Confluence config example
+├── CONFLUENCE_TESTING.md    # Confluence API testing guide
+└── README.md         # This file
 ```
 
-## Supported File Types
+## Supported Content Sources
 
+### File Types
 - **PDF**: `.pdf`
 - **Word Documents**: `.docx`, `.doc`
 - **Text Files**: `.txt`
 - **Markdown**: `.md`
 - **HTML**: `.html`, `.htm`
+
+### Confluence Integration
+- **Confluence Cloud**: OAuth 2.0 authentication
+- **Confluence Server/Data Center**: API token authentication
+- **Content Types**: Pages, spaces, page trees, attachments
+- **Format Conversion**: Automatic HTML to Markdown conversion with macro handling
+- **Synchronization**: Manual and scheduled content synchronization
 
 ## Configuration
 
@@ -234,7 +302,76 @@ JWT_EXPIRATION_MINUTES=30
 
 # OpenAI
 OPENAI_API_KEY=your-openai-api-key
+
+# Confluence Integration (optional)
+CONFLUENCE_OAUTH_CLIENT_ID=your-oauth-client-id
+CONFLUENCE_OAUTH_CLIENT_SECRET=your-oauth-client-secret
+CONFLUENCE_ENCRYPTION_KEY=your-encryption-key-32-bytes
+CONFLUENCE_MAX_IMPORT_SIZE=100
+CONFLUENCE_RATE_LIMIT=10
+CONFLUENCE_SYNC_INTERVAL=3600
+
+# Celery (for background tasks)
+CELERY_BROKER_URL=redis://:changeme@redis:6379/1
+CELERY_RESULT_BACKEND=redis://:changeme@redis:6379/1
 ```
+
+## Confluence Integration Setup
+
+### Getting Confluence Credentials
+
+#### For Confluence Cloud
+1. **API Token Method** (Recommended):
+   - Go to [Atlassian Account Security](https://id.atlassian.com/manage-profile/security/api-tokens)
+   - Click "Create API token"
+   - Label it (e.g., "RADEX RAG Integration")
+   - Copy the generated token
+   - Use with your Atlassian email address
+
+2. **OAuth Method** (Advanced):
+   - Create an OAuth app in [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
+   - Configure OAuth 2.0 with appropriate scopes
+   - Set redirect URI to `http://localhost:8000/api/v1/confluence/oauth/callback`
+   - Add client ID and secret to your .env file
+
+#### For Confluence Server/Data Center
+1. Generate a Personal Access Token or API token from your Confluence admin
+2. Use your Confluence email and the API token
+
+### Setting up Confluence Integration
+
+1. **Configure Environment Variables**:
+   ```bash
+   # Copy the example configuration
+   cp .env.confluence.example .env.confluence
+   
+   # Add to your main .env file
+   cat .env.confluence >> .env
+   ```
+
+2. **Start Celery Workers** (for background imports):
+   ```bash
+   # Start Celery worker for background tasks
+   celery -A app.workers.confluence_import worker --loglevel=info
+   
+   # Start Celery Beat for scheduled tasks (optional)
+   celery -A app.workers.confluence_sync beat --loglevel=info
+   ```
+
+3. **Test the Integration**:
+   - Follow the examples in `CONFLUENCE_TESTING.md`
+   - Use the API docs at `http://localhost:8000/docs`
+   - Check import status and logs
+
+### Confluence Integration Features
+
+- **Content Import**: Import individual pages, entire spaces, or page hierarchies
+- **Attachment Support**: Import and process file attachments
+- **Content Conversion**: Automatic HTML to Markdown conversion with Confluence macro handling
+- **Incremental Sync**: Detect and sync only changed content
+- **Background Processing**: Large imports run asynchronously with progress tracking
+- **Permission Integration**: Imported content respects the existing RBAC system
+- **Search Integration**: Imported Confluence content is searchable via RAG queries
 
 ## Development
 
@@ -398,6 +535,19 @@ tests/
 - `GET /api/v1/rag/folders` - List queryable folders
 - `POST /api/v1/rag/suggest-queries` - Get query suggestions
 - `GET /api/v1/rag/health` - RAG system health
+
+### Confluence Integration
+- `POST /api/v1/confluence/auth` - Add/update Confluence credentials
+- `GET /api/v1/confluence/auth` - List user's Confluence credentials
+- `DELETE /api/v1/confluence/auth/{id}` - Delete Confluence credentials
+- `GET /api/v1/confluence/spaces` - List Confluence spaces
+- `GET /api/v1/confluence/spaces/{key}/pages` - List pages in a space
+- `POST /api/v1/confluence/search` - Search Confluence content
+- `POST /api/v1/confluence/import` - Create import job
+- `POST /api/v1/confluence/import/batch` - Batch import multiple items
+- `GET /api/v1/confluence/import/{id}/status` - Check import status
+- `POST /api/v1/confluence/sync/{id}` - Manual sync of imported content
+- `GET /api/v1/confluence/sync/history` - Get sync history
 
 ## Contributing
 

@@ -20,6 +20,7 @@ class Folder(Base):
     parent = relationship("Folder", remote_side=[id], backref="children")
     documents = relationship("Document", back_populates="folder", cascade="all, delete-orphan")
     permissions = relationship("Permission", back_populates="folder", cascade="all, delete-orphan")
+    confluence_imports = relationship("ConfluenceImport", back_populates="folder", cascade="all, delete-orphan")
     
     __table_args__ = (
         UniqueConstraint('name', 'parent_id', name='_folder_name_parent_uc'),
