@@ -69,9 +69,9 @@ export const signInWithGoogle = async (): Promise<FirebaseUser> => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Google sign-in error:', error);
-    throw new Error(error.message || 'Failed to sign in with Google');
+    throw new Error(error instanceof Error ? error.message : 'Failed to sign in with Google');
   }
 };
 
@@ -82,9 +82,9 @@ export const signInWithMicrosoft = async (): Promise<FirebaseUser> => {
   try {
     const result = await signInWithPopup(auth, microsoftProvider);
     return result.user;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Microsoft sign-in error:', error);
-    throw new Error(error.message || 'Failed to sign in with Microsoft');
+    throw new Error(error instanceof Error ? error.message : 'Failed to sign in with Microsoft');
   }
 };
 
@@ -102,17 +102,17 @@ export const signInWithOkta = async (): Promise<FirebaseUser> => {
     const result = await signInWithPopup(auth, oktaProvider);
     console.log('Okta sign-in successful:', result.user.uid);
     return result.user;
-  } catch (error: any) {
-    console.error('Okta popup sign-in failed, trying redirect...', error);
+  } catch (error: unknown) {
+    console.error('Okta popup sign-in failed, trying redirect...', error instanceof Error ? error.message : 'Failed to sign in with Okta');
 
     // If popup fails, try redirect
     try {
       await signInWithRedirect(auth, oktaProvider);
       // This will redirect the page, so we won't reach here
       throw new Error('Redirect initiated');
-    } catch (redirectError: any) {
+    } catch (redirectError: unknown) {
       console.error('Okta redirect sign-in error:', redirectError);
-      throw new Error(redirectError.message || 'Failed to sign in with Okta');
+      throw new Error(redirectError instanceof Error ? redirectError.message : 'Failed to sign in with Okta');
     }
   }
 };
@@ -121,7 +121,7 @@ export const signInWithOkta = async (): Promise<FirebaseUser> => {
  * Handle redirect result (for Okta OIDC)
  * Call this in your app initialization to handle redirect results
  */
-export const handleRedirectResult = async (): Promise<any> => {
+export const handleRedirectResult = async (): Promise<unknown> => {
   try {
     console.log('Checking for redirect result...');
     const result = await getRedirectResult(auth);
@@ -135,9 +135,9 @@ export const handleRedirectResult = async (): Promise<any> => {
       console.log('No redirect result found');
     }
     return result;
-  } catch (error: any) {
-    console.error('Redirect result error:', error);
-    throw new Error(error.message || 'Failed to handle redirect result');
+  } catch (error: unknown) {
+    console.error('Redirect result error:', error instanceof Error ? error.message : 'Failed to handle redirect result');
+    throw new Error(error instanceof Error ? error.message : 'Failed to handle redirect result');
   }
 };
 
@@ -147,9 +147,9 @@ export const handleRedirectResult = async (): Promise<any> => {
 export const signOut = async (): Promise<void> => {
   try {
     await firebaseSignOut(auth);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sign out error:', error);
-    throw new Error(error.message || 'Failed to sign out');
+    throw new Error(error instanceof Error ? error.message : 'Failed to sign out');
   }
 };
 
@@ -170,8 +170,8 @@ export const getIdToken = async (forceRefresh: boolean = false): Promise<string 
   try {
     const token = await user.getIdToken(forceRefresh);
     return token;
-  } catch (error: any) {
-    console.error('Get ID token error:', error);
+  } catch (error: unknown) {
+    console.error('Get ID token error:', error instanceof Error ? error.message : 'Failed to get ID token');
     return null;
   }
 };

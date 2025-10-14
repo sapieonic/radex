@@ -30,9 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       try {
         // Check for redirect result first
-        const redirectResult = await handleRedirectResult();
+        const redirectResult = await handleRedirectResult() as { user: { uid: string } };
         if (redirectResult) {
-          console.log('Redirect result received:', redirectResult.user.uid);
+          console.log('Redirect result received:', redirectResult?.user?.uid);
         }
       } catch (error) {
         console.error('Error handling redirect result:', error);
@@ -126,11 +126,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Legacy methods (for backward compatibility - can be removed later)
-  const login = async (username: string, password: string) => {
+  const login = async (_username: string, _password: string) => {
     throw new Error('Legacy password authentication is no longer supported. Please use Firebase authentication.');
   };
 
-  const register = async (email: string, username: string, password: string) => {
+  const register = async (_email: string, _username: string, _password: string) => {
     throw new Error('Legacy registration is no longer supported. Please use Firebase authentication.');
   };
 

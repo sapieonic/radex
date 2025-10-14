@@ -1,0 +1,66 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('server/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        cd server
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov pytest-mock
+
+    - name: Run unit tests
+      run: |
+        cd server
+        pytest tests/unit/ -v --cov=app --cov-report=xml --cov-report=term
+      env:
+        # Set minimal environment variables for unit tests
+        DATABASE_URL: sqlite:///./test.db
+        REDIS_URL: redis://localhost:6379/1
+        MINIO_ENDPOINT: localhost:9000
+        MINIO_ACCESS_KEY: minioadmin
+        MINIO_SECRET_KEY: minioadmin
+        MINIO_BUCKET: test-documents
+        JWT_SECRET_KEY: test-secret-key-for-ci
+        JWT_ALGORITHM: HS256
+        JWT_EXPIRATION_MINUTES: 30
+        OPENAI_API_KEY: test-openai-key
+        OPENAI_CHAT_MODEL: gpt-3.5-turbo
+        OPENAI_REFORMULATION_MODEL: gpt-3.5-turbo
+        APP_NAME: RAG RBAC Test
+        DEBUG: true
+
+    - name: Test Summary
+      if: always()
+      run: |
+        echo "## Unit Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "Python version: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

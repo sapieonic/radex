@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from uuid import UUID
 
 class RAGQuery(BaseModel):
@@ -30,3 +30,22 @@ class EmbeddingStatus(BaseModel):
     total_chunks: Optional[int] = None
     processed_chunks: Optional[int] = None
     error_message: Optional[str] = None
+
+# Chat-specific schemas
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(..., min_length=1, max_length=10000)
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage] = Field(..., min_items=1, max_items=100)
+    folder_ids: List[UUID] = Field(..., min_items=1)
+    limit: int = Field(default=10, ge=1, le=50)
+    min_relevance_score: float = Field(default=0.7, ge=0.0, le=1.0)
+
+class ChatResponse(BaseModel):
+    role: Literal["assistant"]
+    content: str
+    sources: List[RAGChunk]
+    total_chunks: int
+    processing_time: float
+    reformulated_query: Optional[str] = None  # The query used for vector search

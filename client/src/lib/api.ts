@@ -193,6 +193,16 @@ class ApiClient {
     return response.data;
   }
 
+  async chatRAG(data: {
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    folder_ids: string[];
+    limit?: number;
+    min_relevance_score?: number;
+  }) {
+    const response = await this.client.post('/api/v1/rag/chat', data);
+    return response.data;
+  }
+
   async getRAGFolders() {
     const response = await this.client.get('/api/v1/rag/folders');
     return response.data;

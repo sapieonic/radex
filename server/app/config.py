@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     
     # OpenAI
     openai_api_key: str
+    openai_chat_model: str = "gpt-3.5-turbo"  # Model for answer generation
+    openai_reformulation_model: str = "gpt-3.5-turbo"  # Model for query reformulation
 
     # Firebase (optional - for Firebase authentication)
     firebase_admin_sdk_json: Optional[str] = None  # JSON string of Firebase service account credentials

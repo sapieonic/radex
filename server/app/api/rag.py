@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas import RAGQuery, RAGResponse
+from app.schemas import RAGQuery, RAGResponse, ChatRequest, ChatResponse
 from app.models import User as UserModel
 from app.core.dependencies import get_current_active_user
 from app.core.exceptions import BadRequestException, PermissionDeniedException
@@ -71,6 +71,37 @@ async def suggest_related_queries(
     
     return {"suggestions": suggestions}
 
+@router.post("/chat", response_model=ChatResponse)
+async def rag_chat(
+    chat_request: ChatRequest,
+    current_user: UserModel = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Submit a chat request with conversation history and get an AI-generated response.
+
+    This endpoint:
+    - Accepts OpenAI-style message format (user/assistant/system roles)
+    - Maintains conversation context using the last 5 messages
+    - Reformulates queries based on conversation history for better retrieval
+    - Returns response with source citations
+    """
+    rag_service = RAGService(db)
+
+    try:
+        response = await rag_service.chat(
+            user_id=current_user.id,
+            chat_request=chat_request
+        )
+        return response
+    except (BadRequestException, PermissionDeniedException) as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
 @router.get("/health")
 def rag_health_check(
     current_user: UserModel = Depends(get_current_active_user),
@@ -78,15 +109,15 @@ def rag_health_check(
 ) -> Dict[str, Any]:
     """Check RAG system health and user's access"""
     rag_service = RAGService(db)
-    
+
     # Get basic stats about user's accessible content
     queryable_folders = rag_service.get_queryable_folders(current_user.id)
-    
+
     total_folders = len(queryable_folders)
     queryable_folders_count = len([f for f in queryable_folders if f["can_query"]])
     total_documents = sum(f["document_count"] for f in queryable_folders)
     total_embeddings = sum(f["embedding_count"] for f in queryable_folders)
-    
+
     return {
         "status": "healthy",
         "user_id": str(current_user.id),
