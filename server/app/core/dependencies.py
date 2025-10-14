@@ -20,10 +20,10 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Get current user from Firebase ID token
+    Get current user from either Firebase ID token or legacy JWT token
 
-    This function verifies the Firebase ID token and returns the corresponding user.
-    If the user doesn't exist, they will be automatically created.
+    This function first tries to verify as a Firebase token, and if that fails,
+    falls back to legacy JWT verification for backward compatibility.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -33,32 +33,46 @@ async def get_current_user(
 
     token = credentials.credentials
 
+    # Try Firebase ID token first
     try:
-        # Verify Firebase ID token
         decoded_token = FirebaseService.verify_id_token(token)
         firebase_uid = decoded_token.get("uid")
 
-        if not firebase_uid:
-            raise credentials_exception
+        if firebase_uid:
+            # Get user by Firebase UID
+            user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
 
-        # Get user by Firebase UID
-        user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+            if user is None:
+                logger.warning(f"User with Firebase UID {firebase_uid} not found in database")
+                raise credentials_exception
 
-        if user is None:
-            # User not found - this shouldn't happen if they authenticated through Firebase login
-            # but we'll handle it gracefully
-            logger.warning(f"User with Firebase UID {firebase_uid} not found in database")
-            raise credentials_exception
-
-        return user
-
-    except ValueError as e:
-        # Firebase token verification failed
-        logger.error(f"Firebase token verification failed: {e}")
-        raise credentials_exception
+            return user
     except Exception as e:
-        logger.error(f"Error validating credentials: {e}")
+        # Firebase token verification failed, try legacy JWT
+        logger.debug(f"Firebase token verification failed: {e}, trying legacy JWT")
+        pass
+
+    # Fallback to legacy JWT token verification
+    try:
+        payload = decode_access_token(token)
+        user_id: str = payload.get("sub")
+
+        if user_id is None:
+            raise credentials_exception
+
+        token_data = TokenData(user_id=user_id)
+    except JWTError as e:
+        logger.error(f"JWT token verification failed: {e}")
         raise credentials_exception
+
+    # Get user by ID (legacy JWT uses user ID)
+    user = db.query(User).filter(User.id == token_data.user_id).first()
+
+    if user is None:
+        logger.warning(f"User with ID {token_data.user_id} not found in database")
+        raise credentials_exception
+
+    return user
 
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
