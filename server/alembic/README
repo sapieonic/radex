@@ -1,0 +1,227 @@
+# Alembic Migrations Directory
+
+This directory contains the database migration framework configuration and all migration scripts.
+
+## Directory Structure
+
+```
+alembic/
+├── README_ALEMBIC.md      # This file
+├── env.py                 # Migration environment configuration
+├── script.py.mako         # Template for new migration files
+└── versions/              # Individual migration files
+    ├── 20251013_2237-dcd397241ba3_initial_schema.py
+    └── ...
+```
+
+## What's What
+
+### `env.py`
+
+This file:
+- Configures the database connection using settings from `app/config.py`
+- Imports all models to enable auto-detection
+- Sets up the migration environment
+- Handles both online and offline migration modes
+
+**Don't modify unless you know what you're doing!**
+
+### `script.py.mako`
+
+Template file used to generate new migration files. It defines the structure of:
+- Migration metadata (revision, down_revision, etc.)
+- `upgrade()` function
+- `downgrade()` function
+
+### `versions/`
+
+Contains all migration files. Each file:
+- Has a unique revision ID
+- References its parent migration (down_revision)
+- Contains `upgrade()` and `downgrade()` functions
+- Is timestamped in the filename
+
+## Migration File Naming
+
+Format: `YYYYMMDD_HHMM-{revision_id}_{slug}.py`
+
+Example: `20251013_2237-dcd397241ba3_initial_schema.py`
+
+- `20251013_2237`: Timestamp (October 13, 2025, 22:37)
+- `dcd397241ba3`: Unique revision ID
+- `initial_schema`: Description slug from migration message
+
+## Creating New Migrations
+
+**Use the helper script instead of Alembic directly:**
+
+```bash
+# Good - uses migrate.py
+python migrate.py create "Add email field to users"
+
+# Less convenient - direct alembic
+alembic revision --autogenerate -m "Add email field to users"
+```
+
+## Migration Version Chain
+
+Migrations form a linked list:
+
+```
+None (base)
+  ↓
+dcd397241ba3 (initial_schema)
+  ↓
+abc123def456 (add_email_field)
+  ↓
+... (future migrations)
+  ↓
+head (latest migration)
+```
+
+Each migration knows its parent via `down_revision`.
+
+## Tracking Applied Migrations
+
+Applied migrations are tracked in the `alembic_version` table:
+
+```sql
+-- This table is automatically created by Alembic
+SELECT * FROM alembic_version;
+
+  version_num
+--------------
+ dcd397241ba3
+```
+
+Only one row exists, containing the current revision ID.
+
+## Auto-Generation
+
+When you run:
+```bash
+python migrate.py create "message"
+```
+
+Alembic:
+1. Connects to the database
+2. Reads current schema
+3. Compares with SQLAlchemy models (from `Base.metadata`)
+4. Generates migration operations for differences
+5. Creates new file in `versions/`
+
+**Always review the generated file!**
+
+## Best Practices for This Directory
+
+1. **Never manually delete migration files**
+   - Use `downgrade` instead
+   - Maintain the version chain
+
+2. **Don't edit applied migrations**
+   - Create a new migration instead
+   - Editing breaks the version chain
+
+3. **Keep migrations focused**
+   - One logical change per migration
+   - Easier to review and rollback
+
+4. **Commit migrations with code**
+   - Migration and model changes go together
+   - Enables code/schema synchronization
+
+5. **Test both directions**
+   - Test `upgrade()` function
+   - Test `downgrade()` function
+   - Ensure reversibility
+
+## Common Issues
+
+### Import Errors in env.py
+
+If you see import errors when running migrations:
+
+```bash
+ImportError: cannot import name 'YourModel' from 'app.models'
+```
+
+Fix by:
+1. Ensure model file exists in `app/models/`
+2. Import added to `alembic/env.py`
+3. Model inherits from correct `Base`
+
+### Migration Not Detected
+
+If changes aren't auto-detected:
+
+1. Check model is imported in `env.py`
+2. Verify model in `Base.metadata.tables`
+3. Ensure database connection works
+
+```bash
+# Test imports
+python -c "from alembic.env import target_metadata; print(target_metadata.tables.keys())"
+```
+
+### Merge Conflicts
+
+If multiple developers create migrations:
+
+```bash
+# Will show multiple heads
+alembic heads
+
+# Merge them
+alembic merge -m "Merge branches" head1 head2
+
+# Apply merged migration
+python migrate.py upgrade
+```
+
+## For Developers
+
+When working with migrations:
+
+1. **Pull latest code**
+   ```bash
+   git pull origin main
+   ```
+
+2. **Apply pending migrations**
+   ```bash
+   python migrate.py status
+   python migrate.py upgrade
+   ```
+
+3. **Make model changes**
+   - Edit models in `app/models/`
+
+4. **Create migration**
+   ```bash
+   python migrate.py create "Description of changes"
+   ```
+
+5. **Review generated file**
+   - Check `alembic/versions/latest_file.py`
+   - Verify `upgrade()` and `downgrade()`
+
+6. **Test migration**
+   ```bash
+   python migrate.py upgrade    # Test upgrade
+   python migrate.py downgrade  # Test rollback
+   python migrate.py upgrade    # Reapply
+   ```
+
+7. **Commit both files**
+   ```bash
+   git add app/models/your_model.py
+   git add alembic/versions/new_migration.py
+   git commit -m "Add field_name to model_name"
+   ```
+
+## Additional Resources
+
+- Parent directory `MIGRATIONS.md` - Full migration guide
+- Parent directory `MIGRATION_QUICK_REF.md` - Quick reference
+- `migrate.py` - Helper script documentation
+- [Alembic Docs](https://alembic.sqlalchemy.org/) - Official documentation
