@@ -32,6 +32,11 @@ class FirebaseService:
         if cls._initialized:
             return
 
+        # Check if Firebase credentials are provided
+        if not settings.firebase_admin_sdk_json:
+            logger.warning("Firebase Admin SDK credentials not provided - Firebase authentication will not be available")
+            raise ValueError("Firebase credentials not configured")
+
         try:
             # Parse Firebase service account JSON from environment variable
             service_account_info = json.loads(settings.firebase_admin_sdk_json)
@@ -263,8 +268,10 @@ class FirebaseService:
             raise
 
 
-# Initialize Firebase on module import
+# Initialize Firebase on module import (optional - will initialize on first use if not done here)
 try:
     FirebaseService.initialize()
 except Exception as e:
-    logger.error(f"Failed to initialize Firebase service on module import: {e}")
+    logger.warning(f"Firebase Admin SDK not initialized on import (will attempt on first use): {e}")
+    # This is not a critical error - Firebase initialization can happen lazily
+    # The app will still work with legacy JWT authentication

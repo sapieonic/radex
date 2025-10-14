@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
 
-    # Firebase
-    firebase_admin_sdk_json: str  # JSON string of Firebase service account credentials
+    # Firebase (optional - for Firebase authentication)
+    firebase_admin_sdk_json: Optional[str] = None  # JSON string of Firebase service account credentials
 
     # Okta (for SAML integration via Firebase)
     okta_client_id: Optional[str] = None
