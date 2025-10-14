@@ -101,11 +101,11 @@ jobs:
           sleep 5
         done
 
-    - name: Initialize database
+    - name: Run database migrations
       working-directory: ./server
       run: |
-        # Run database initialization if needed
-        PGPASSWORD=changeme psql -h localhost -U raguser -d ragdb -f init.sql || echo "Database already initialized"
+        # Run Alembic migrations to set up database schema
+        python migrate.py upgrade
       env:
         DATABASE_URL: postgresql+psycopg://raguser:changeme@localhost:5432/ragdb
         REDIS_URL: redis://:changeme@localhost:6379/0
