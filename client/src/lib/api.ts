@@ -31,8 +31,15 @@ class ApiClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          this.removeToken();
-          window.location.href = '/login';
+          console.error('401 Unauthorized error:', error.response?.data);
+          // Only redirect if we're not already on the login page
+          // and if this is not the initial firebase login attempt
+          if (typeof window !== 'undefined' &&
+              !window.location.pathname.includes('/login') &&
+              !error.config.url?.includes('/firebase/login')) {
+            this.removeToken();
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }
@@ -49,22 +56,44 @@ class ApiClient {
     localStorage.removeItem('auth_token');
   }
 
-  public setToken(token: string): void {
+  public setToken(token: string | null): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('auth_token', token);
+    if (token) {
+      localStorage.setItem('auth_token', token);
+    } else {
+      localStorage.removeItem('auth_token');
+    }
   }
 
   // Auth endpoints
+
+  /**
+   * Authenticate with Firebase ID token
+   * This is the primary authentication method
+   */
+  async firebaseLogin(idToken: string) {
+    const response = await this.client.post('/api/v1/auth/firebase/login', {
+      id_token: idToken
+    });
+    return response.data;
+  }
+
+  /**
+   * Legacy password authentication (deprecated)
+   */
   async register(data: { email: string; username: string; password: string }) {
     const response = await this.client.post('/api/v1/auth/register', data);
     return response.data;
   }
 
+  /**
+   * Legacy password login (deprecated)
+   */
   async login(username: string, password: string) {
     const formData = new FormData();
     formData.append('username', username);
     formData.append('password', password);
-    
+
     const response = await this.client.post('/api/v1/auth/login', formData, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
@@ -161,6 +190,16 @@ class ApiClient {
   // RAG endpoints
   async queryRAG(data: { query: string; folder_ids: string[]; limit?: number }) {
     const response = await this.client.post('/api/v1/rag/query', data);
+    return response.data;
+  }
+
+  async chatRAG(data: {
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    folder_ids: string[];
+    limit?: number;
+    min_relevance_score?: number;
+  }) {
+    const response = await this.client.post('/api/v1/rag/chat', data);
     return response.data;
   }
 

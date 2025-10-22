@@ -1,22 +1,78 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from app.database import get_db
 from app.schemas import UserCreate, User, Token, UserLogin
 from app.services.auth_service import AuthService
 from app.core.security import create_access_token
 from app.core.dependencies import get_current_active_user
 from app.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class FirebaseTokenRequest(BaseModel):
+    """Request model for Firebase authentication"""
+    id_token: str
+
+
+class FirebaseAuthResponse(BaseModel):
+    """Response model for Firebase authentication"""
+    user: User
+    access_token: str
+    token_type: str = "bearer"
+
+@router.post("/firebase/login", response_model=User)
+def firebase_login(
+    token_request: FirebaseTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Authenticate with Firebase ID token
+
+    This endpoint accepts a Firebase ID token from the client, verifies it,
+    and either creates a new user or updates an existing user's information.
+    Returns the user object with their information.
+    """
+    try:
+        auth_service = AuthService(db)
+        user = auth_service.authenticate_with_firebase(token_request.id_token)
+
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive"
+            )
+
+        logger.info(f"User {user.email} authenticated successfully via Firebase")
+        return user
+
+    except ValueError as e:
+        logger.warning(f"Firebase authentication failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during Firebase authentication: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication failed"
+        )
+
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 def register(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
-    """Register a new user"""
+    """Register a new user (Legacy - for backward compatibility)"""
     auth_service = AuthService(db)
     user = auth_service.create_user(user_data)
     return user

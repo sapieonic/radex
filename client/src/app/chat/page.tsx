@@ -1,29 +1,34 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChatMessage, RAGResponse } from '@/types/rag';
+import { UIChatMessage, ChatResponse, ChatMessage } from '@/types/rag';
 import { Folder } from '@/types/folder';
 import apiClient from '@/lib/api';
+import { loadConversation, saveConversation, clearConversation } from '@/lib/chatStorage';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { 
-  Send, 
-  Folder as FolderIcon, 
-  MessageSquare, 
-  User, 
-  Bot, 
-  Copy, 
+import {
+  Send,
+  Folder as FolderIcon,
+  MessageSquare,
+  User,
+  Bot,
+  Copy,
   CheckSquare,
   Square,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Trash2,
+  Info
 } from 'lucide-react';
+
+const CONTEXT_WINDOW_SIZE = 5;
 
 export default function ChatPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFoldersLoading, setIsFoldersLoading] = useState(true);
@@ -37,6 +42,17 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Load conversation from localStorage when folder selection changes
+  useEffect(() => {
+    if (selectedFolders.size > 0) {
+      const folderIds = Array.from(selectedFolders);
+      const savedMessages = loadConversation(folderIds);
+      setMessages(savedMessages);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedFolders]);
 
   const loadRAGFolders = async () => {
     try {
@@ -72,46 +88,76 @@ export default function ChatPage() {
     setSelectedFolders(new Set());
   };
 
+  const handleClearChat = () => {
+    if (selectedFolders.size === 0) return;
+
+    const confirmed = window.confirm('Are you sure you want to clear this conversation?');
+    if (confirmed) {
+      const folderIds = Array.from(selectedFolders);
+      clearConversation(folderIds);
+      setMessages([]);
+    }
+  };
+
   const handleSubmitQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim() || selectedFolders.size === 0 || isLoading) return;
 
-    const userMessage: ChatMessage = {
+    const userMessage: UIChatMessage = {
       id: Date.now().toString(),
-      type: 'user',
+      role: 'user',
       content: query.trim(),
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setQuery('');
     setIsLoading(true);
 
     try {
-      const response: RAGResponse = await apiClient.queryRAG({
-        query: userMessage.content,
-        folder_ids: Array.from(selectedFolders),
+      const folderIds = Array.from(selectedFolders);
+
+      // Prepare chat messages (take last N for context)
+      const contextMessages: ChatMessage[] = updatedMessages
+        .slice(-CONTEXT_WINDOW_SIZE)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+      const response: ChatResponse = await apiClient.chatRAG({
+        messages: contextMessages,
+        folder_ids: folderIds,
         limit: 5,
       });
 
-      const assistantMessage: ChatMessage = {
+      const assistantMessage: UIChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: response.answer,
+        role: 'assistant',
+        content: response.content,
         timestamp: new Date(),
         sources: response.sources,
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      const finalMessages = [...updatedMessages, assistantMessage];
+      setMessages(finalMessages);
+
+      // Save to localStorage
+      saveConversation(folderIds, finalMessages);
     } catch (error: unknown) {
       console.error('Failed to query RAG:', error);
-      const errorMessage: ChatMessage = {
+      const errorMessage: UIChatMessage = {
         id: (Date.now() + 1).toString(),
-        type: 'assistant',
+        role: 'assistant',
         content: 'Sorry, I encountered an error processing your query.',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      const finalMessages = [...updatedMessages, errorMessage];
+      setMessages(finalMessages);
+
+      // Save to localStorage even on error
+      saveConversation(Array.from(selectedFolders), finalMessages);
     } finally {
       setIsLoading(false);
     }
@@ -196,8 +242,29 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
         <div className="bg-white border-b border-gray-200 p-4">
-          <h1 className="text-xl font-semibold text-gray-900">RAG Chat</h1>
-          <p className="text-gray-600">Ask questions about your documents</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">RAG Chat</h1>
+              <p className="text-gray-600">Ask questions about your documents</p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center text-sm text-gray-500 bg-blue-50 px-3 py-1 rounded-full">
+                <Info className="w-4 h-4 mr-1" />
+                <span>Using last {CONTEXT_WINDOW_SIZE} messages for context</span>
+              </div>
+              {messages.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleClearChat}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Clear Chat
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Messages */}
@@ -212,22 +279,22 @@ export default function ChatPage() {
             messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex space-x-3 max-w-3xl ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                <div className={`flex space-x-3 max-w-3xl ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    message.type === 'user' ? 'bg-blue-600' : 'bg-gray-600'
+                    message.role === 'user' ? 'bg-blue-600' : 'bg-gray-600'
                   }`}>
-                    {message.type === 'user' ? (
+                    {message.role === 'user' ? (
                       <User className="w-4 h-4 text-white" />
                     ) : (
                       <Bot className="w-4 h-4 text-white" />
                     )}
                   </div>
-                  
+
                   <div className={`rounded-lg px-4 py-3 ${
-                    message.type === 'user' 
-                      ? 'bg-blue-600 text-white' 
+                    message.role === 'user'
+                      ? 'bg-blue-600 text-white'
                       : 'bg-white border border-gray-200 text-gray-900'
                   }`}>
                     <div className="text-sm whitespace-pre-wrap">{message.content}</div>
@@ -273,12 +340,12 @@ export default function ChatPage() {
                     )}
                     
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                      <div className={`text-xs ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                        {message.timestamp.toLocaleTimeString()}
+                      <div className={`text-xs ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
+                        {message.timestamp instanceof Date ? message.timestamp.toLocaleTimeString() : message.timestamp}
                       </div>
                       <button
                         onClick={() => copyMessage(message.content)}
-                        className={`${message.type === 'user' ? 'text-blue-200 hover:text-white' : 'text-gray-400 hover:text-gray-600'} transition-colors`}
+                        className={`${message.role === 'user' ? 'text-blue-200 hover:text-white' : 'text-gray-400 hover:text-gray-600'} transition-colors`}
                       >
                         <Copy className="w-3 h-3" />
                       </button>
