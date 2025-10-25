@@ -68,6 +68,14 @@ class ApiClient {
   // Auth endpoints
 
   /**
+   * Get authentication configuration
+   */
+  async getAuthConfig() {
+    const response = await this.client.get('/api/v1/auth/config');
+    return response.data;
+  }
+
+  /**
    * Authenticate with Firebase ID token
    * This is the primary authentication method
    */
@@ -79,7 +87,7 @@ class ApiClient {
   }
 
   /**
-   * Legacy password authentication (deprecated)
+   * Manual password registration
    */
   async register(data: { email: string; username: string; password: string }) {
     const response = await this.client.post('/api/v1/auth/register', data);
@@ -87,7 +95,7 @@ class ApiClient {
   }
 
   /**
-   * Legacy password login (deprecated)
+   * Manual password login
    */
   async login(username: string, password: string) {
     const formData = new FormData();
