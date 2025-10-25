@@ -125,13 +125,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Legacy methods (for backward compatibility - can be removed later)
-  const login = async (_username: string, _password: string) => {
-    throw new Error('Legacy password authentication is no longer supported. Please use Firebase authentication.');
+  // Manual password authentication
+  const login = async (username: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.login(username, password);
+      const token = response.access_token;
+
+      // Set token and get user info
+      apiClient.setToken(token);
+      setTokenState(token);
+
+      const userData = await apiClient.getCurrentUser();
+      setUser(userData);
+
+      return userData;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const register = async (_email: string, _username: string, _password: string) => {
-    throw new Error('Legacy registration is no longer supported. Please use Firebase authentication.');
+  const register = async (email: string, username: string, password: string) => {
+    try {
+      setIsLoading(true);
+      const userData = await apiClient.register({ email, username, password });
+
+      // Auto-login after registration
+      await login(username, password);
+
+      return userData;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = async () => {

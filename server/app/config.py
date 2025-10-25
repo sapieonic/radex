@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # Firebase (optional - for Firebase authentication)
     firebase_admin_sdk_json: Optional[str] = None  # JSON string of Firebase service account credentials
 
+    # Authentication Provider Flags
+    enable_google_login: bool = True  # Google login is always enabled
+    enable_microsoft_login: bool = False  # Microsoft login disabled by default
+    enable_okta_login: bool = False  # Okta login disabled by default
+    enable_manual_signup: bool = True  # Manual signup enabled by default
+
     # Okta (for SAML integration via Firebase)
     okta_client_id: Optional[str] = None
     okta_client_secret: Optional[str] = None

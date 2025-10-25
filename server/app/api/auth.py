@@ -16,6 +16,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class AuthConfigResponse(BaseModel):
+    """Response model for authentication configuration"""
+    enable_google_login: bool
+    enable_microsoft_login: bool
+    enable_okta_login: bool
+    enable_manual_signup: bool
+
+
 class FirebaseTokenRequest(BaseModel):
     """Request model for Firebase authentication"""
     id_token: str
@@ -26,6 +34,23 @@ class FirebaseAuthResponse(BaseModel):
     user: User
     access_token: str
     token_type: str = "bearer"
+
+
+@router.get("/config", response_model=AuthConfigResponse)
+def get_auth_config():
+    """
+    Get authentication configuration
+
+    Returns which authentication methods are enabled on the server.
+    This allows the frontend to conditionally show/hide login options.
+    """
+    return AuthConfigResponse(
+        enable_google_login=settings.enable_google_login,
+        enable_microsoft_login=settings.enable_microsoft_login,
+        enable_okta_login=settings.enable_okta_login,
+        enable_manual_signup=settings.enable_manual_signup
+    )
+
 
 @router.post("/firebase/login", response_model=User)
 def firebase_login(

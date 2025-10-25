@@ -6,12 +6,12 @@ A comprehensive Retrieval-Augmented Generation (RAG) system with Role-Based Acce
 
 ### Core Capabilities
 - **🤖 AI-Powered RAG**: Query documents using natural language with OpenAI-powered responses and source citations
-- **🔐 Secure Authentication**: JWT-based authentication with bcrypt password hashing
+- **🔐 Flexible Authentication**: Support for manual signup/login, Google, Microsoft, and Okta SSO (configurable via environment flags)
 - **👥 Role-Based Access Control**: Granular permissions at folder and document levels
 - **📁 Hierarchical Organization**: Nested folder structure with permission inheritance
 - **📄 Multi-Format Support**: Process PDF, Word, Text, Markdown, and HTML documents
 - **☁️ S3-Compatible Storage**: MinIO object storage for scalable file management
-- **📱 Responsive UI**: Modern React/Next.js interface with mobile-first design
+- **📱 Responsive UI**: Modern React/Next.js interface with split-screen landing page
 - **⚡ Real-time Updates**: Live document processing status and chat responses
 
 ### Technical Features
@@ -96,6 +96,12 @@ MINIO_SECRET_KEY=minioadmin
 
 # Redis
 REDIS_URL=redis://:changeme@redis:6379/0
+
+# Authentication Provider Flags (Optional)
+ENABLE_GOOGLE_LOGIN=true
+ENABLE_MICROSOFT_LOGIN=false
+ENABLE_OKTA_LOGIN=false
+ENABLE_MANUAL_SIGNUP=true
 ```
 
 #### Client Configuration
@@ -110,6 +116,21 @@ cp .env.local.example .env.local
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_APP_NAME=RADEX
 NEXT_PUBLIC_MAX_FILE_SIZE=10485760
+
+# Authentication Provider Flags (Optional - should match server config)
+NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN=true
+NEXT_PUBLIC_ENABLE_MICROSOFT_LOGIN=false
+NEXT_PUBLIC_ENABLE_OKTA_LOGIN=false
+NEXT_PUBLIC_ENABLE_MANUAL_SIGNUP=true
+
+# Firebase Configuration (Optional - required if using Firebase auth providers)
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-firebase-app-id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
 ```
 
 ### 3. Start the Application
@@ -182,6 +203,54 @@ cd server
 # Option 2: Python script
 python create_admin_user.py
 ```
+
+### 5. Authentication Configuration
+
+RADEX supports multiple authentication methods that can be enabled or disabled via environment variables:
+
+#### Authentication Providers
+
+1. **Manual Signup/Login** (Password-based)
+   - Traditional email/username and password authentication
+   - Controlled by `ENABLE_MANUAL_SIGNUP` (default: `true`)
+   - Users can create accounts directly on the login page
+
+2. **Google OAuth**
+   - Sign in with Google account via Firebase
+   - Controlled by `ENABLE_GOOGLE_LOGIN` (default: `true`)
+   - Requires Firebase configuration
+
+3. **Microsoft OAuth**
+   - Sign in with Microsoft account via Firebase
+   - Controlled by `ENABLE_MICROSOFT_LOGIN` (default: `false`)
+   - Requires Firebase configuration
+
+4. **Okta SSO**
+   - Enterprise SSO via Okta OIDC
+   - Controlled by `ENABLE_OKTA_LOGIN` (default: `false`)
+   - Requires Firebase and Okta configuration
+
+#### Configuration
+
+Set these flags in both server and client environment files:
+
+**Server** (`server/.env`):
+```env
+ENABLE_GOOGLE_LOGIN=true
+ENABLE_MICROSOFT_LOGIN=false
+ENABLE_OKTA_LOGIN=false
+ENABLE_MANUAL_SIGNUP=true
+```
+
+**Client** (`client/.env.local`):
+```env
+NEXT_PUBLIC_ENABLE_GOOGLE_LOGIN=true
+NEXT_PUBLIC_ENABLE_MICROSOFT_LOGIN=false
+NEXT_PUBLIC_ENABLE_OKTA_LOGIN=false
+NEXT_PUBLIC_ENABLE_MANUAL_SIGNUP=true
+```
+
+The landing page will automatically show/hide authentication options based on these flags.
 
 ## 📚 Usage Guide
 
