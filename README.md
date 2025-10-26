@@ -6,12 +6,12 @@ A comprehensive Retrieval-Augmented Generation (RAG) system with Role-Based Acce
 
 ### Core Capabilities
 - **🤖 AI-Powered RAG**: Query documents using natural language with OpenAI-powered responses and source citations
-- **🔐 Secure Authentication**: JWT-based authentication with bcrypt password hashing
+- **🔐 Firebase Authentication**: Secure authentication with Email/Password and OAuth (Google, Microsoft, Okta)
 - **👥 Role-Based Access Control**: Granular permissions at folder and document levels
 - **📁 Hierarchical Organization**: Nested folder structure with permission inheritance
 - **📄 Multi-Format Support**: Process PDF, Word, Text, Markdown, and HTML documents
 - **☁️ S3-Compatible Storage**: MinIO object storage for scalable file management
-- **📱 Responsive UI**: Modern React/Next.js interface with mobile-first design
+- **📱 Responsive UI**: Modern React/Next.js interface with split-screen authentication design
 - **⚡ Real-time Updates**: Live document processing status and chat responses
 
 ### Technical Features
@@ -102,14 +102,32 @@ REDIS_URL=redis://:changeme@redis:6379/0
 ```bash
 cd ../client
 cp .env.local.example .env.local
-# Usually no changes needed for local development
+# Edit .env.local with your Firebase configuration
 ```
 
 **Client environment variables:**
 ```env
+# API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Application Configuration
 NEXT_PUBLIC_APP_NAME=RADEX
 NEXT_PUBLIC_MAX_FILE_SIZE=10485760
+
+# Authentication Configuration
+# Toggle OAuth providers (both default to false)
+NEXT_PUBLIC_ENABLE_MICROSOFT_LOGIN=false
+NEXT_PUBLIC_ENABLE_OKTA_LOGIN=false
+
+# Firebase Configuration
+# Get these from Firebase Console -> Project Settings -> General -> Your apps -> Web app
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your-measurement-id
 ```
 
 ### 3. Start the Application
@@ -183,11 +201,93 @@ cd server
 python create_admin_user.py
 ```
 
+## 🔐 Authentication
+
+RADEX uses **Firebase Authentication** for all authentication methods, providing a secure and scalable authentication solution.
+
+### Available Authentication Methods
+
+1. **Email/Password** (Always enabled)
+   - Users can sign up with email and password
+   - Passwords are securely managed by Firebase
+   - No passwords are stored on the RADEX server
+
+2. **Google OAuth** (Always enabled)
+   - Sign in with Google accounts
+   - Requires Google provider enabled in Firebase Console
+
+3. **Microsoft OAuth** (Optional - controlled by env flag)
+   - Sign in with Microsoft accounts
+   - Set `NEXT_PUBLIC_ENABLE_MICROSOFT_LOGIN=true` in client `.env.local`
+   - Requires Microsoft provider configured in Firebase Console
+
+4. **Okta OIDC** (Optional - controlled by env flag)
+   - Sign in with Okta accounts
+   - Set `NEXT_PUBLIC_ENABLE_OKTA_LOGIN=true` in client `.env.local`
+   - Requires Okta OIDC provider configured in Firebase Console
+
+### Firebase Setup
+
+#### 1. Create Firebase Project
+- Go to [Firebase Console](https://console.firebase.google.com/)
+- Create a new project or use an existing one
+
+#### 2. Enable Authentication Providers
+- Navigate to **Authentication** > **Sign-in method**
+- Enable **Email/Password** provider
+- Enable **Google** provider
+- (Optional) Enable **Microsoft** provider
+- (Optional) Configure **Okta OIDC** provider
+
+#### 3. Get Client Configuration
+- Go to **Project Settings** > **General**
+- Scroll to "Your apps" section
+- Click "Web app" and copy the configuration
+- Add values to `client/.env.local`
+
+#### 4. Get Server Configuration (Firebase Admin SDK)
+- Go to **Project Settings** > **Service accounts**
+- Click "Generate new private key"
+- Save the JSON file securely
+- Set `FIREBASE_ADMIN_SDK_JSON` in `server/.env` to the JSON content (as a string)
+
+### Authentication Flow
+
+1. User signs up/logs in using any authentication method on the landing page
+2. Firebase authenticates the user and returns an ID token
+3. Client automatically sends the Firebase ID token to the RADEX server
+4. Server verifies the token using Firebase Admin SDK
+5. Server creates/updates user record with provider information (password/google/microsoft/okta)
+6. User is authenticated and can access protected resources
+
+### Landing Page Design
+
+The login and registration pages feature a modern **split-screen design**:
+
+**Left Side** (hidden on mobile):
+- Gradient background (blue to indigo)
+- RADEX branding
+- Feature highlights with icons:
+  - AI-Powered Search
+  - Secure Access Control
+  - Multi-Format Support
+  - Team Collaboration
+
+**Right Side**:
+- Clean authentication form
+- Email/password input fields
+- OAuth provider buttons (Google always visible, Microsoft/Okta conditionally displayed)
+- Sign up/sign in navigation
+
 ## 📚 Usage Guide
 
 ### Basic Workflow
 
-1. **Login**: Navigate to http://localhost:3000 and login
+1. **Login**: Navigate to http://localhost:3000 and sign in using:
+   - Email/password (if you have an account)
+   - Google (click "Google" button)
+   - Microsoft (if enabled via environment flag)
+   - Okta (if enabled via environment flag)
 2. **Create Folders**: Organize documents in hierarchical folders
 3. **Upload Documents**: Drag and drop files or use the upload button
 4. **Set Permissions**: Share folders with specific users (Owner/Editor/Viewer)
@@ -261,8 +361,9 @@ With the server running:
 ### Key API Endpoints
 
 #### Authentication
-- `POST /api/v1/auth/register` - User registration
-- `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/firebase/login` - Authenticate with Firebase ID token (primary method)
+- `POST /api/v1/auth/register` - User registration (legacy - use Firebase email/password instead)
+- `POST /api/v1/auth/login` - User login (legacy - use Firebase email/password instead)
 - `GET /api/v1/auth/me` - Current user info
 - `POST /api/v1/auth/refresh` - Refresh token
 
@@ -292,31 +393,39 @@ With the server running:
 
 ### Example API Usage
 
+**Note**: Authentication is handled via Firebase on the client side. The examples below show direct API usage, but in practice, the client handles Firebase authentication automatically.
+
 ```bash
-# Register user
+# Authenticate with Firebase ID token (primary method)
+# First, obtain a Firebase ID token from the client-side Firebase SDK
+curl -X POST "http://localhost:8000/api/v1/auth/firebase/login" \
+  -H "Content-Type: application/json" \
+  -d '{"id_token": "YOUR_FIREBASE_ID_TOKEN"}'
+
+# Legacy: Register user (use Firebase email/password signup instead)
 curl -X POST "http://localhost:8000/api/v1/auth/register" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "username": "testuser", "password": "secure123"}'
 
-# Login
+# Legacy: Login (use Firebase email/password login instead)
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "username=testuser&password=secure123"
 
-# Create folder (with auth token)
+# Create folder (with Firebase ID token)
 curl -X POST "http://localhost:8000/api/v1/folders" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "My Documents"}'
 
 # Upload document
 curl -X POST "http://localhost:8000/api/v1/folders/{folder_id}/documents" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \
   -F "file=@document.pdf"
 
 # Query with RAG
 curl -X POST "http://localhost:8000/api/v1/rag/query" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer YOUR_FIREBASE_ID_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "What are the main topics?", "folder_ids": ["folder-id"]}'
 ```
@@ -427,30 +536,45 @@ lsof -i :8000  # Check what's using port 8000
 
 ### Production Deployment
 
-1. **Change all default credentials**:
-   - Admin password
-   - JWT_SECRET_KEY
-   - Database passwords
-   - MinIO credentials
+1. **Firebase Authentication**:
+   - Keep Firebase Admin SDK credentials secure
+   - Never commit `FIREBASE_ADMIN_SDK_JSON` to version control
+   - Store as environment variable or use secrets manager
+   - Rotate Firebase service account keys periodically
+   - Change default admin password immediately
 
-2. **Use HTTPS**:
+2. **Environment Configuration**:
+   - **Required**: Set up Firebase project with proper security rules
+   - **Client**: Never commit `.env.local` with Firebase credentials
+   - **Server**: Securely store Firebase Admin SDK JSON
+   - **Database**: Use strong passwords for PostgreSQL, Redis, MinIO
+   - Use secrets management in production (AWS Secrets Manager, Azure Key Vault, etc.)
+   - Rotate all API keys regularly (OpenAI, Firebase, etc.)
+
+3. **HTTPS Configuration**:
    - Set up reverse proxy (nginx/traefik)
-   - Configure SSL certificates
+   - Configure SSL certificates (Let's Encrypt recommended)
+   - Enable HTTPS for both client and server
+   - Update Firebase Auth domain to use HTTPS
 
-3. **Environment variables**:
-   - Never commit .env files
-   - Use secrets management in production
-   - Rotate API keys regularly
-
-4. **Database security**:
-   - Use strong passwords
-   - Enable SSL connections
+4. **Database Security**:
+   - Use strong passwords for all database services
+   - Enable SSL/TLS connections
    - Regular backups
+   - Implement database connection pooling
 
-5. **File upload security**:
-   - Validate file types
+5. **File Upload Security**:
+   - Validate file types on both client and server
    - Scan for malware
-   - Set size limits
+   - Set appropriate size limits (`NEXT_PUBLIC_MAX_FILE_SIZE`)
+   - Use MinIO bucket policies to restrict access
+
+6. **Authentication Best Practices**:
+   - All authentication flows use Firebase (no passwords stored on server)
+   - Firebase ID tokens are verified on every request
+   - Tokens automatically expire and refresh
+   - Environment flags control which OAuth providers are available
+   - Admin users are granted via database, not Firebase
 
 ## 📝 License
 

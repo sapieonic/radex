@@ -16,6 +16,9 @@ import {
   getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
   User as FirebaseUser,
 } from 'firebase/auth';
 
@@ -114,6 +117,45 @@ export const signInWithOkta = async (): Promise<FirebaseUser> => {
       console.error('Okta redirect sign-in error:', redirectError);
       throw new Error(redirectError instanceof Error ? redirectError.message : 'Failed to sign in with Okta');
     }
+  }
+};
+
+/**
+ * Sign up with email and password
+ */
+export const signUpWithEmailPassword = async (
+  email: string,
+  password: string,
+  displayName?: string
+): Promise<FirebaseUser> => {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, password);
+
+    // Update profile with display name if provided
+    if (displayName && result.user) {
+      await updateProfile(result.user, { displayName });
+    }
+
+    return result.user;
+  } catch (error: unknown) {
+    console.error('Email/password sign-up error:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to create account');
+  }
+};
+
+/**
+ * Sign in with email and password
+ */
+export const signInWithEmailPassword = async (
+  email: string,
+  password: string
+): Promise<FirebaseUser> => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    return result.user;
+  } catch (error: unknown) {
+    console.error('Email/password sign-in error:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to sign in');
   }
 };
 

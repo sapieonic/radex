@@ -253,13 +253,79 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Running Tests
 
-#### Prerequisites for Testing
+The project includes comprehensive test coverage with both unit tests and integration smoke tests.
+
+#### Test Structure
+
+```
+tests/
+├── unit/                          # Unit tests (isolated, fast)
+│   ├── conftest.py               # Unit test fixtures and mocks
+│   ├── api/                      # API endpoint tests
+│   │   └── test_auth.py         # Authentication endpoints
+│   ├── core/                     # Core functionality tests
+│   │   └── test_security.py     # Password hashing, JWT tokens
+│   ├── schemas/                  # Pydantic schema validation tests
+│   │   └── test_rag.py          # RAG request/response schemas
+│   ├── services/                 # Business logic tests
+│   │   └── test_permission_service.py  # RBAC permission logic
+│   └── utils/                    # Utility function tests
+│       └── test_text_chunking.py # Text processing utilities
+└── smoke/                         # Integration smoke tests
+    ├── conftest.py               # Smoke test fixtures
+    ├── test_auth_smoke.py        # Authentication lifecycle tests
+    ├── test_folders_smoke.py     # Folder CRUD and permissions
+    ├── test_documents_smoke.py   # Document management tests
+    ├── test_rag_smoke.py         # RAG functionality tests
+    └── test_e2e_smoke.py         # Complete system integration tests
+```
+
+#### Running Unit Tests
+
+Unit tests are fast, isolated tests that don't require external services. They use mocking to test business logic independently.
+
+```bash
+# Set up Python environment
+python3 -m venv myenv
+source myenv/bin/activate
+pip install -r requirements.txt
+
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov pytest-mock
+
+# Run all unit tests
+pytest tests/unit/ -v
+
+# Run with coverage report
+pytest tests/unit/ --cov=app --cov-report=html --cov-report=term
+
+# Run specific test file
+pytest tests/unit/core/test_security.py -v
+
+# Run specific test class or method
+pytest tests/unit/services/test_permission_service.py::TestCheckFolderPermission -v
+```
+
+**Unit Test Coverage:**
+- 99 unit tests covering core functionality
+- API endpoints, authentication, and authorization
+- Password hashing and JWT token generation
+- RAG schema validation
+- Permission checking and RBAC logic
+- Text chunking and processing utilities
+
+**Coverage Goals:**
+- Overall coverage: 80%+
+- New code coverage: 90%+
+- Critical paths: 100%
+
+#### Prerequisites for Integration Testing
 
 1. **Start the development services:**
    ```bash
    # Start infrastructure services
    docker-compose -f dev-docker-compose.yml up -d
-   
+
    # Or start all services including postgres, redis, minio
    docker-compose up -d postgres redis minio
    ```
@@ -269,7 +335,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    # Create virtual environment
    python3 -m venv venv
    source venv/bin/activate
-   
+
    # Install dependencies
    pip install -r requirements.txt
    pip install pytest pytest-asyncio httpx
@@ -281,25 +347,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-#### Running All Tests
+#### Running Integration Tests
 
 ```bash
-# Run all tests
+# Run all tests (unit + smoke)
 pytest tests/
 
-# Run with verbose output
-pytest tests/ -v
-
-# Run specific test files
-pytest tests/test_auth.py
-pytest tests/test_folders.py
-```
-
-#### Running Smoke Tests
-
-The smoke tests validate the complete system integration and require the full environment to be running:
-
-```bash
 # Run all smoke tests
 pytest tests/smoke/ -v
 
@@ -327,29 +380,33 @@ pytest tests/smoke/test_rag_smoke.py -v
 pytest tests/smoke/test_e2e_smoke.py::test_complete_rag_rbac_system_e2e_smoke -v
 ```
 
+#### Continuous Integration
+
+Unit tests run automatically on every push and pull request via GitHub Actions:
+
+```yaml
+# See .github/workflows/unit-tests.yml
+- Runs on: ubuntu-latest
+- Python version: 3.11
+- Coverage reporting included
+- No external dependencies required
+```
+
 #### Test Environment Notes
 
+**Unit Tests:**
+- No external services required (database, Redis, MinIO)
+- Use mocking for all external dependencies
+- Fast execution (< 3 seconds for all 99 tests)
+- Run in CI/CD pipeline on every commit
+- Coverage reports generated automatically
+
+**Smoke Tests:**
 - **Cleanup**: All smoke tests include automatic cleanup of created resources
-- **Isolation**: Each test uses unique usernames/emails to avoid conflicts  
+- **Isolation**: Each test uses unique usernames/emails to avoid conflicts
 - **Permissions**: Tests validate RBAC functionality thoroughly
 - **Error Handling**: Tests cover both success and failure scenarios
 - **Integration**: E2E tests validate complete system workflows
-
-#### Test Structure
-
-```
-tests/
-├── conftest.py                    # Shared test fixtures
-├── test_auth.py                   # Unit tests for authentication
-├── test_folders.py                # Unit tests for folder management
-├── smoke/                         # Integration smoke tests
-│   ├── conftest.py               # Smoke test fixtures
-│   ├── test_auth_smoke.py        # Authentication lifecycle tests
-│   ├── test_folders_smoke.py     # Folder CRUD and permissions
-│   ├── test_documents_smoke.py   # Document management tests
-│   ├── test_rag_smoke.py         # RAG functionality tests
-│   └── test_e2e_smoke.py         # Complete system integration tests
-```
 
 ## Security Features
 

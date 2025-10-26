@@ -8,6 +8,8 @@ import {
   signInWithGoogle,
   signInWithMicrosoft,
   signInWithOkta,
+  signUpWithEmailPassword,
+  signInWithEmailPassword,
   signOut as firebaseSignOut,
   getIdToken,
   handleRedirectResult,
@@ -125,13 +127,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Legacy methods (for backward compatibility - can be removed later)
-  const login = async (_username: string, _password: string) => {
-    throw new Error('Legacy password authentication is no longer supported. Please use Firebase authentication.');
+  // Manual login with email/password via Firebase
+  const login = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      await signInWithEmailPassword(email, password);
+      // Firebase auth state listener will handle the rest
+    } catch (error) {
+      setIsLoading(false);
+      throw error;
+    }
   };
 
-  const register = async (_email: string, _username: string, _password: string) => {
-    throw new Error('Legacy registration is no longer supported. Please use Firebase authentication.');
+  // Manual registration with email/password via Firebase
+  const register = async (email: string, username: string, password: string) => {
+    try {
+      setIsLoading(true);
+      // Create user in Firebase with email/password
+      // Use username as display name
+      await signUpWithEmailPassword(email, password, username);
+      // Firebase auth state listener will handle the rest
+    } catch (error) {
+      setIsLoading(false);
+      throw error;
+    }
   };
 
   const logout = async () => {
