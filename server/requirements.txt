@@ -19,6 +19,8 @@ python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt<4.2.0
 firebase-admin==6.8.0
+cryptography==44.0.0  # For provider token encryption (Fernet)
+python-dateutil==2.9.0  # For ISO date parsing in SharePoint integration
 
 # File upload and multipart
 python-multipart==0.0.20

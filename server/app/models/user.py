@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Boolean, DateTime, func, Enum
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from app.database import Base
 import uuid
 import enum
@@ -39,3 +40,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    provider_connections = relationship("ProviderConnection", back_populates="user", cascade="all, delete-orphan")

@@ -209,13 +209,111 @@ class DocumentService:
         document = self.get_document(document_id)
         if not document:
             raise NotFoundException("Document not found")
-        
+
         # Merge with existing metadata
         existing_metadata = document.doc_metadata or {}
         existing_metadata.update(metadata)
         document.doc_metadata = existing_metadata
-        
+
         self.db.commit()
         self.db.refresh(document)
-        
+
         return document
+
+    async def create_document_from_file(
+        self,
+        folder_id: UUID,
+        file_path: str,
+        filename: str,
+        file_size: int,
+        uploaded_by: UUID,
+        content_type: str = None
+    ) -> Document:
+        """
+        Create a document from a file path (used for provider sync).
+
+        Args:
+            folder_id: Target folder UUID
+            file_path: Path to local file
+            filename: Original filename
+            file_size: File size in bytes
+            uploaded_by: User UUID
+            content_type: Optional MIME type
+
+        Returns:
+            Created Document instance
+
+        Raises:
+            NotFoundException: If folder not found
+            BadRequestException: If file validation or upload fails
+        """
+        # Validate folder exists
+        folder = self.db.query(Folder).filter(Folder.id == folder_id).first()
+        if not folder:
+            raise NotFoundException("Folder not found")
+
+        # Validate file size
+        if not validate_file_size(file_size):
+            raise BadRequestException("File size exceeds maximum limit (50MB)")
+
+        # Get file type
+        file_type = get_file_type(filename)
+        if not file_type:
+            raise BadRequestException("Could not determine file type")
+
+        # Read file and generate hash
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+        file_hash = self._generate_file_hash(file_content)
+
+        # Check if file already exists in folder
+        existing_doc = self.db.query(Document).filter(
+            Document.folder_id == folder_id,
+            Document.filename == filename
+        ).first()
+
+        if existing_doc:
+            # Update filename to avoid conflict (append timestamp)
+            import time
+            base, ext = os.path.splitext(filename)
+            filename = f"{base}_{int(time.time())}{ext}"
+
+        # Create document record
+        document = Document(
+            folder_id=folder_id,
+            filename=filename,
+            file_type=file_type,
+            file_size=file_size,
+            file_path="",  # Will be updated after MinIO upload
+            doc_metadata={"file_hash": file_hash, "source": "provider_sync"},
+            uploaded_by=uploaded_by
+        )
+
+        self.db.add(document)
+        self.db.flush()  # Get the document ID
+
+        # Upload to MinIO
+        object_name = self._get_object_name(str(document.id), filename)
+
+        try:
+            # Determine content type if not provided
+            if not content_type:
+                content_type = f"application/{file_type}"
+
+            self.minio_client.fput_object(
+                settings.minio_bucket,
+                object_name,
+                file_path,
+                content_type=content_type
+            )
+
+            # Update document with file path
+            document.file_path = object_name
+            self.db.commit()
+            self.db.refresh(document)
+
+            return document
+
+        except S3Error as e:
+            self.db.rollback()
+            raise BadRequestException(f"Failed to upload file to storage: {str(e)}")

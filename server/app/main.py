@@ -6,7 +6,7 @@ import uvicorn
 from app.config import settings
 from app.database import engine
 from app.models import Base
-from app.api import auth, folders, documents, rag, users
+from app.api import auth, folders, documents, rag, users, sharepoint, sync, config
 from app.core.exceptions import (
     CredentialsException,
     PermissionDeniedException,
@@ -14,6 +14,7 @@ from app.core.exceptions import (
     BadRequestException,
     ConflictException
 )
+from app.services.token_encryption_service import init_token_encryption_service
 
 # Create database tables
 try:
@@ -81,6 +82,9 @@ app.include_router(folders.router, prefix="/api/v1/folders", tags=["folders"])
 app.include_router(documents.router, prefix="/api/v1", tags=["documents"])
 app.include_router(rag.router, prefix="/api/v1/rag", tags=["rag"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
+app.include_router(config.router, prefix="/api/v1/config", tags=["configuration"])
+app.include_router(sharepoint.router, prefix="/api/v1/providers/sharepoint", tags=["sharepoint"])
+app.include_router(sync.router, prefix="/api/v1/sync", tags=["sync"])
 
 # Root endpoints
 @app.get("/")
@@ -105,13 +109,34 @@ def health_check():
 async def startup_event():
     print(f"Starting {settings.app_name}")
     print(f"Debug mode: {settings.debug}")
-    
+
     # Validate critical settings
     if not settings.jwt_secret_key or settings.jwt_secret_key == "your-secret-key-change-this":
         print("WARNING: JWT secret key is not properly configured!")
-    
+
     if not settings.openai_api_key or settings.openai_api_key == "your-openai-api-key":
         print("WARNING: OpenAI API key is not properly configured!")
+
+    # Initialize token encryption service for provider OAuth tokens
+    if settings.encryption_key:
+        try:
+            init_token_encryption_service(settings.encryption_key)
+            print("Token encryption service initialized successfully")
+        except Exception as e:
+            print(f"WARNING: Failed to initialize token encryption service: {e}")
+            if settings.enable_sharepoint_provider:
+                print("SharePoint provider will not function without encryption service!")
+    else:
+        if settings.enable_sharepoint_provider:
+            print("WARNING: SharePoint provider enabled but ENCRYPTION_KEY not set!")
+
+    # Log SharePoint provider status
+    if settings.enable_sharepoint_provider:
+        print("SharePoint/OneDrive provider: ENABLED")
+        if not all([settings.sp_client_id, settings.sp_client_secret, settings.sp_redirect_uri]):
+            print("WARNING: SharePoint credentials incomplete. Set SP_CLIENT_ID, SP_CLIENT_SECRET, SP_REDIRECT_URI")
+    else:
+        print("SharePoint/OneDrive provider: DISABLED")
 
 @app.on_event("shutdown")
 async def shutdown_event():

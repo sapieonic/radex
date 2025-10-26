@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     okta_api_token: Optional[str] = None
     okta_api_audience: Optional[str] = None
 
+    # SharePoint/OneDrive Provider
+    enable_sharepoint_provider: bool = False  # ENV-based feature flag
+    sp_client_id: Optional[str] = None  # Microsoft App Registration Client ID
+    sp_client_secret: Optional[str] = None  # Microsoft App Registration Client Secret
+    sp_redirect_uri: Optional[str] = None  # OAuth callback URL
+
+    # Token Encryption (for provider OAuth tokens)
+    encryption_key: Optional[str] = None  # Fernet encryption key (base64)
+
     # App
     app_name: str = "RAG RBAC System"
     debug: bool = True

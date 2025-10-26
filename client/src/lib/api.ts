@@ -367,9 +367,129 @@ class ApiClient {
     const params: Record<string, string | number> = {};
     if (folderId) params.folder_id = folderId;
     if (limit) params.limit = limit;
-    
+
     const response = await this.client.get('/api/v1/confluence/sync/history', { params });
     return response.data;
+  }
+
+  // Configuration endpoints
+  async getProvidersConfig() {
+    const response = await this.client.get('/api/v1/config/providers');
+    return response.data;
+  }
+
+  // SharePoint/OneDrive Provider endpoints
+
+  /**
+   * Start SharePoint OAuth flow
+   * Returns authorization URL to redirect user to
+   */
+  async startSharePointAuth() {
+    const response = await this.client.post('/api/v1/providers/sharepoint/auth/start');
+    return response.data; // { auth_url, state }
+  }
+
+  /**
+   * Complete SharePoint OAuth flow
+   * Exchange authorization code for connection
+   */
+  async completeSharePointAuth(code: string, state: string) {
+    const response = await this.client.post('/api/v1/providers/sharepoint/auth/callback', {
+      code,
+      state,
+    });
+    return response.data; // { connection_id, tenant_id, created_at }
+  }
+
+  /**
+   * Disconnect SharePoint connection
+   */
+  async disconnectSharePoint(connectionId: string) {
+    await this.client.delete(`/api/v1/providers/sharepoint/connections/${connectionId}`);
+  }
+
+  /**
+   * List user's SharePoint connections
+   */
+  async getSharePointConnections() {
+    const response = await this.client.get('/api/v1/providers/sharepoint/connections');
+    return response.data; // { connections: [...] }
+  }
+
+  /**
+   * Get OneDrive root drive information
+   */
+  async getOneDriveRoot(connectionId: string) {
+    const response = await this.client.get(
+      `/api/v1/providers/sharepoint/${connectionId}/onedrive/root`
+    );
+    return response.data; // DriveInfo
+  }
+
+  /**
+   * Get children of a drive item (files and folders)
+   */
+  async getDriveChildren(
+    connectionId: string,
+    driveId: string,
+    itemId: string = 'root',
+    pageToken?: string
+  ) {
+    const params: Record<string, string> = { item_id: itemId };
+    if (pageToken) params.page_token = pageToken;
+
+    const response = await this.client.get(
+      `/api/v1/providers/sharepoint/${connectionId}/drives/${driveId}/children`,
+      { params }
+    );
+    return response.data; // { items: [...], next_link: ... }
+  }
+
+  /**
+   * Search SharePoint sites
+   */
+  async searchSharePointSites(connectionId: string, query: string) {
+    const response = await this.client.get(
+      `/api/v1/providers/sharepoint/${connectionId}/sites/search`,
+      { params: { query } }
+    );
+    return response.data; // { sites: [...] }
+  }
+
+  /**
+   * Get drives (document libraries) for a SharePoint site
+   */
+  async getSiteDrives(connectionId: string, siteId: string) {
+    const response = await this.client.get(
+      `/api/v1/providers/sharepoint/${connectionId}/sites/${siteId}/drives`
+    );
+    return response.data; // { drives: [...] }
+  }
+
+  /**
+   * Get metadata for a specific item
+   */
+  async getSharePointItemMetadata(connectionId: string, driveId: string, itemId: string) {
+    const response = await this.client.get(
+      `/api/v1/providers/sharepoint/${connectionId}/items/${driveId}/${itemId}`
+    );
+    return response.data; // DriveItem
+  }
+
+  /**
+   * Import files from SharePoint/OneDrive into RADEX
+   */
+  async importFromSharePoint(data: {
+    connection_id: string;
+    folder_id: string;
+    items: Array<{
+      drive_id: string;
+      item_id: string;
+      e_tag?: string;
+    }>;
+  }) {
+    const response = await this.client.post('/api/v1/sync/import', data);
+    return response.data; // { total, succeeded, skipped, failed, results: [...] }
   }
 }
 

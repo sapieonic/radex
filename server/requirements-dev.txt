@@ -18,6 +18,8 @@ email_validator==2.2.0
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 firebase-admin==6.8.0
+cryptography==44.0.0
+python-dateutil==2.9.0
 
 # File upload and multipart
 python-multipart==0.0.20

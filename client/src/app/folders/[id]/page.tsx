@@ -1,32 +1,38 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Folder as FolderType } from '@/types/folder';
 import { Document } from '@/types/document';
 import apiClient from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { 
-  Folder, 
-  FileText, 
-  Upload, 
-  MoreVertical, 
-  Edit2, 
+import {
+  Folder,
+  FileText,
+  Upload,
+  MoreVertical,
+  Edit2,
   Trash2,
   Download,
   Calendar,
   Shield,
-  Share2
+  Share2,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useDropzone } from 'react-dropzone';
 import ShareFolderModal from '@/components/folders/ShareFolderModal';
+import { SourceSelectionModal } from '@/components/SourceSelectionModal';
+import { SharePointFilePicker } from '@/components/SharePointFilePicker';
+import type { SyncImportResponse } from '@/types/sharepoint';
 
 export default function FolderDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const folderId = params.id as string;
-  
+
   const [folder, setFolder] = useState<FolderType | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +40,13 @@ export default function FolderDetailPage() {
   const [newName, setNewName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // SharePoint integration state
+  const [showSourceSelection, setShowSourceSelection] = useState(false);
+  const [showSharePointPicker, setShowSharePointPicker] = useState(false);
+  const [sharePointConnectionId, setSharePointConnectionId] = useState<string | null>(null);
+  const [uploadMode, setUploadMode] = useState<'local' | 'sharepoint' | null>(null);
+  const [importResult, setImportResult] = useState<SyncImportResponse | null>(null);
 
   const loadFolderData = useCallback(async () => {
     try {
@@ -56,6 +69,21 @@ export default function FolderDetailPage() {
       loadFolderData();
     }
   }, [folderId, loadFolderData]);
+
+  // Check for SharePoint OAuth success on page load
+  useEffect(() => {
+    const spAuth = searchParams.get('sp_auth');
+    if (spAuth === 'success') {
+      // Get connection ID from session storage
+      const connectionId = sessionStorage.getItem('sp_connection_id');
+      if (connectionId) {
+        setSharePointConnectionId(connectionId);
+        setShowSharePointPicker(true);
+        // Clear from session storage
+        sessionStorage.removeItem('sp_connection_id');
+      }
+    }
+  }, [searchParams]);
 
   const handleUpdateFolderName = async () => {
     if (!newName.trim() || !folder) return;
@@ -97,9 +125,67 @@ export default function FolderDetailPage() {
     }
   };
 
+  // SharePoint integration handlers
+  const handleSelectLocal = () => {
+    setUploadMode('local');
+    // Trigger the file input click programmatically
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) fileInput.click();
+  };
+
+  const handleSelectSharePoint = async () => {
+    try {
+      // Check for existing connections
+      const connections = await apiClient.getSharePointConnections();
+
+      if (connections.connections && connections.connections.length > 0) {
+        // Use existing connection
+        const connection = connections.connections[0];
+        setSharePointConnectionId(connection.id);
+        setShowSharePointPicker(true);
+      } else {
+        // Start OAuth flow
+        const authResponse = await apiClient.startSharePointAuth();
+        // Redirect to Microsoft OAuth
+        window.location.href = authResponse.auth_url;
+      }
+    } catch (error) {
+      console.error('Failed to start SharePoint auth:', error);
+      alert('Failed to connect to Microsoft 365. Please try again.');
+    }
+  };
+
+  const handleImportComplete = async (result: SyncImportResponse) => {
+    setImportResult(result);
+
+    // Show success/error message
+    const successCount = result.succeeded;
+    const failedCount = result.failed;
+    const skippedCount = result.skipped;
+
+    let message = '';
+    if (successCount > 0) {
+      message += `${successCount} file${successCount !== 1 ? 's' : ''} imported successfully. `;
+    }
+    if (skippedCount > 0) {
+      message += `${skippedCount} file${skippedCount !== 1 ? 's' : ''} already synced. `;
+    }
+    if (failedCount > 0) {
+      message += `${failedCount} file${failedCount !== 1 ? 's' : ''} failed to import.`;
+    }
+
+    alert(message);
+
+    // Reload folder data
+    await loadFolderData();
+
+    // Clear result after 5 seconds
+    setTimeout(() => setImportResult(null), 5000);
+  };
+
   const onDrop = async (acceptedFiles: File[]) => {
     setIsUploading(true);
-    
+
     try {
       for (const file of acceptedFiles) {
         await apiClient.uploadDocument(folderId, file);
@@ -234,12 +320,37 @@ export default function FolderDetailPage() {
 
       {/* Upload Area */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Documents</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-gray-900">Upload Documents</h2>
+          <Button onClick={() => setShowSourceSelection(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Files
+          </Button>
+        </div>
+
+        {/* Import result notification */}
+        {importResult && (
+          <div className={`mb-4 p-4 rounded-lg flex items-start ${
+            importResult.failed > 0 ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'
+          }`}>
+            {importResult.failed > 0 ? (
+              <XCircle className="w-5 h-5 text-yellow-600 mt-0.5 mr-2" />
+            ) : (
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 mr-2" />
+            )}
+            <div className="flex-1">
+              <p className={`text-sm font-medium ${importResult.failed > 0 ? 'text-yellow-800' : 'text-green-800'}`}>
+                Import completed: {importResult.succeeded} succeeded, {importResult.skipped} skipped, {importResult.failed} failed
+              </p>
+            </div>
+          </div>
+        )}
+
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragActive 
-              ? 'border-blue-500 bg-blue-50' 
+            isDragActive
+              ? 'border-blue-500 bg-blue-50'
               : 'border-gray-300 hover:border-gray-400'
           }`}
         >
@@ -250,7 +361,7 @@ export default function FolderDetailPage() {
           ) : (
             <div>
               <p className="text-gray-600 mb-2">
-                Drag and drop files here, or click to select
+                Drag and drop files here
               </p>
               <p className="text-sm text-gray-500">
                 Supports PDF, DOC, DOCX, TXT, MD, HTML files
@@ -342,6 +453,26 @@ export default function FolderDetailPage() {
           folderName={folder.name}
         />
       )}
+
+      {/* Source Selection Modal */}
+      <SourceSelectionModal
+        isOpen={showSourceSelection}
+        onClose={() => setShowSourceSelection(false)}
+        onSelectLocal={handleSelectLocal}
+        onSelectSharePoint={handleSelectSharePoint}
+      />
+
+      {/* SharePoint File Picker */}
+      <SharePointFilePicker
+        isOpen={showSharePointPicker}
+        onClose={() => {
+          setShowSharePointPicker(false);
+          setSharePointConnectionId(null);
+        }}
+        connectionId={sharePointConnectionId}
+        folderId={folderId}
+        onImportComplete={handleImportComplete}
+      />
     </div>
   );
 }
